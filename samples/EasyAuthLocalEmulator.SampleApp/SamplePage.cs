@@ -21,15 +21,11 @@ internal static class SamplePage
         string principalName = GetHeader(context, EasyAuthHeaders.PrincipalName);
         string identityProvider = GetHeader(context, EasyAuthHeaders.IdentityProvider);
         bool isAuthenticated = principal.Length > 0;
-        bool isProxied = GetHeader(context, "X-Forwarded-Host").Length > 0;
         string decodedPrincipal = DecodePrincipal(principal);
         string authenticationControls = RenderAuthenticationControls(
             isAuthenticated,
             principalName,
             identityProvider);
-        string environmentNote = isProxied
-            ? """Connected through the local Easy Auth emulator at <code>http://127.0.0.1:4180</code>."""
-            : """This page bypasses the Easy Auth emulator. Open <code>http://127.0.0.1:4180</code> instead.""";
 
         return $$"""
             <!doctype html>
@@ -37,7 +33,7 @@ internal static class SamplePage
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>Identity diagnostics · Easy Auth sample app</title>
+              <title>Identity diagnostics · Easy Auth Local emulator sample app</title>
               <style>
                 :root {
                   color-scheme: light;
@@ -69,7 +65,6 @@ internal static class SamplePage
                 }
                 .app-identity { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
                 .app-name { font-weight: 650; white-space: nowrap; }
-                .environment { color: #bfc7d2; font-size: .75rem; }
                 .auth-controls { display: flex; align-items: center; gap: 14px; }
                 .account { min-width: 0; display: grid; justify-items: end; line-height: 1.2; }
                 .account-name { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .875rem; font-weight: 600; }
@@ -115,15 +110,7 @@ internal static class SamplePage
                 .sign-in-menu nav a:hover { background: var(--surface-subtle); }
                 main { width: min(1040px, calc(100% - 40px)); margin: 34px auto 64px; }
                 .page-header { margin-bottom: 28px; }
-                .page-header h1 { margin: 0 0 6px; font-size: 1.75rem; font-weight: 600; letter-spacing: -.02em; }
-                .page-header > p { margin: 0; color: var(--muted); }
-                .connection-note {
-                  margin: 14px 0 0;
-                  padding-top: 12px;
-                  border-top: 1px solid var(--border);
-                  color: var(--muted);
-                  font-size: .8rem;
-                }
+                .page-header h1 { margin: 0; font-size: 1.75rem; font-weight: 600; letter-spacing: -.02em; }
                 .workspace-section { padding: 26px 0; border-top: 1px solid var(--border); }
                 .workspace-section h2 { margin: 0 0 14px; font-size: 1rem; font-weight: 650; }
                 .data-table { margin: 0; border-top: 1px solid var(--border); }
@@ -203,8 +190,7 @@ internal static class SamplePage
               <header class="app-bar">
                 <div class="app-bar-inner">
                   <div class="app-identity">
-                    <span class="app-name">Easy Auth sample app</span>
-                    <span class="environment">Local emulator</span>
+                    <span class="app-name">Easy Auth Local emulator sample app</span>
                   </div>
                   {{authenticationControls}}
                 </div>
@@ -213,8 +199,6 @@ internal static class SamplePage
               <main>
                 <header class="page-header">
                   <h1>Identity diagnostics</h1>
-                  <p>Inspect the identity and headers received by this application.</p>
-                  <p class="connection-note">{{environmentNote}}</p>
                 </header>
 
                 <section class="workspace-section" aria-labelledby="session-heading">
@@ -339,7 +323,7 @@ internal static class SamplePage
                     <span class="account-name">{{name}}</span>
                     <span class="account-provider">{{provider}}</span>
                   </div>
-                  <a class="bar-action" href="/.auth/logout">Sign out</a>
+                  <a class="bar-action" href="/.auth/logout?post_logout_redirect_uri=/">Sign out</a>
                 </div>
                 """;
         }

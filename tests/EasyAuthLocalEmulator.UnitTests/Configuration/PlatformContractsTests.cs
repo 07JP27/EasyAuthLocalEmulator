@@ -9,22 +9,26 @@ public sealed class PlatformContractsTests
         EmulatedPlatform.AppService,
         "app-service",
         "Azure App Service Easy Auth",
+        "Azure App Service",
         "/.auth/logout/complete")]
     [InlineData(
         EmulatedPlatform.ContainerApps,
         "container-apps",
         "Azure Container Apps authentication",
+        "Azure Container Apps",
         "/.auth/logout/done")]
     public void ReturnsPlatformContract(
         EmulatedPlatform platform,
         string cliValue,
         string displayName,
+        string uiDisplayName,
         string logoutPath)
     {
         PlatformContract contract = PlatformContracts.Get(platform);
 
         Assert.Equal(cliValue, contract.CliValue);
         Assert.Equal(displayName, contract.DisplayName);
+        Assert.Equal(uiDisplayName, contract.UiDisplayName);
         Assert.Equal(logoutPath, contract.DefaultLogoutCompletePath);
     }
 

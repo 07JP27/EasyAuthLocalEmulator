@@ -20,11 +20,11 @@ public static class AuthAssets
         body { margin: 0; min-height: 100vh; }
         a { color: var(--primary); }
         .shell { width: min(780px, 100%); margin: 0 auto; padding: 32px 24px 0; }
-        .auth-header { margin: 8px 0 28px; }
+        .auth-header { margin: 8px 0 24px; }
         .product-name { margin: 0; color: #343A40; font-size: .875rem; font-weight: 650; }
         .platform-name { margin: 3px 0 18px; color: var(--muted); font-size: .78rem; }
         h1 { margin: 0 0 8px; font-size: 2rem; font-weight: 550; letter-spacing: -.025em; }
-        .auth-header > p:last-child { max-width: 66ch; margin: 0; color: var(--muted); }
+        .login-platform-name { margin: 0; color: var(--muted); font-size: .875rem; }
         .auth-form { width: 100%; }
         .visually-hidden {
           position: absolute;
@@ -83,29 +83,38 @@ public static class AuthAssets
           font-size: .8rem;
           line-height: 1.4;
         }
-        .provider-change { margin-top: 5px; }
-        .provider-change summary {
-          display: inline-flex;
-          min-height: 32px;
-          align-items: center;
-          color: var(--primary);
-          cursor: pointer;
-          font-size: .8rem;
-          font-weight: 600;
-        }
-        .provider-change nav {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px 14px;
-          padding: 5px 0 4px;
-          font-size: .825rem;
-        }
-        .provider-change a[aria-current="page"] { color: #454b52; font-weight: 650; text-decoration: none; }
         .inline-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
         .repeat-list { display: grid; gap: 8px; }
-        .repeat-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
-        .claim-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
-        .claim-row label { display: block; margin-bottom: 4px; color: var(--muted); font-size: .75rem; }
+        .repeat-row {
+          display: grid;
+          column-gap: 8px;
+          row-gap: 5px;
+          align-items: start;
+        }
+        .role-row {
+          grid-template-columns: minmax(0, 1fr) auto;
+          grid-template-areas:
+            "role-input remove"
+            "role-error .";
+        }
+        .role-row .repeat-input { grid-area: role-input; }
+        .role-row .remove { grid-area: remove; }
+        .role-row [data-error-for="role"] { grid-area: role-error; }
+        .claim-row {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+          grid-template-areas:
+            "type-label value-label ."
+            "type-input value-input remove"
+            "type-error value-error .";
+        }
+        .claim-row label { margin: 0; color: var(--muted); font-size: .75rem; }
+        .claim-type-label { grid-area: type-label; }
+        .claim-type-input { grid-area: type-input; }
+        .claim-row [data-error-for="claim-type"] { grid-area: type-error; }
+        .claim-value-label { grid-area: value-label; }
+        .claim-value-input { grid-area: value-input; }
+        .claim-row [data-error-for="claim-value"] { grid-area: value-error; }
+        .claim-row .remove { grid-area: remove; }
         .button {
           min-height: 40px;
           border: 1px solid transparent;
@@ -149,7 +158,8 @@ public static class AuthAssets
         .summary-meta { margin-left: auto; color: var(--muted); font-size: .75rem; font-weight: 400; }
         .advanced-fields { padding-top: 4px; }
         .advanced-help { margin-left: 204px; }
-        .form-message { margin: 0 0 8px 204px; }
+        .form-message { margin: 18px 0 0; }
+        .form-message ul { margin: 0; padding-left: 20px; }
         .form-actions {
           display: flex;
           justify-content: flex-end;
@@ -159,7 +169,15 @@ public static class AuthAssets
           border-top: 1px solid var(--border-subtle);
         }
         .session-note { margin: 8px 0 0; color: var(--muted); font-size: .8rem; text-align: right; }
-        .validation-summary-errors, .field-validation-error { color: #a51d2d; }
+        .input-validation-error { border-color: var(--danger); }
+        .validation-summary-errors, .field-validation-error { color: var(--danger); }
+        .field-validation-error {
+          display: block;
+          margin-top: 5px;
+          font-size: .8rem;
+          line-height: 1.4;
+        }
+        .repeat-row .field-validation-error { margin-top: 0; }
         .validation-summary-valid, .field-validation-valid { display: none; }
         code { padding: 1px 3px; color: #31363d; background: #f1f2f3; border-radius: 2px; }
         .logout-content { max-width: 560px; }
@@ -174,10 +192,19 @@ public static class AuthAssets
           .form-row > legend { padding-top: 0; }
           fieldset.form-row > legend { float: none; width: auto; }
           fieldset.form-row > .control { grid-column: 1; }
-          .claim-row { grid-template-columns: 1fr; }
-          .repeat-row { align-items: stretch; }
-          .repeat-row .remove { justify-self: start; min-height: 32px; }
-          .advanced-help, .form-message { margin-left: 0; }
+          .claim-row {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+              "type-label"
+              "type-input"
+              "type-error"
+              "value-label"
+              "value-input"
+              "value-error"
+              "remove";
+          }
+          .repeat-row .remove { justify-self: start; }
+          .advanced-help { margin-left: 0; }
           .form-actions { justify-content: flex-start; }
           .session-note { text-align: left; }
         }
@@ -199,6 +226,18 @@ public static class AuthAssets
               row.querySelectorAll("label[for]").forEach((label) => {
                 label.htmlFor = label.htmlFor.replace(/_\d+__/, `_${index}__`);
               });
+              row.querySelectorAll("[aria-describedby]").forEach((element) => {
+                element.setAttribute(
+                  "aria-describedby",
+                  element.getAttribute("aria-describedby").replace(/_\d+__/, `_${index}__`)
+                );
+              });
+              row.querySelectorAll("[data-valmsg-for]").forEach((element) => {
+                element.setAttribute(
+                  "data-valmsg-for",
+                  element.getAttribute("data-valmsg-for").replace(/\[\d+\]/, `[${index}]`)
+                );
+              });
             });
           };
 
@@ -218,10 +257,24 @@ public static class AuthAssets
             addButton.addEventListener("click", () => {
               const index = container.querySelectorAll("[data-row]").length;
               const fragment = template.content.cloneNode(true);
-              fragment.querySelectorAll("[name], [id], label[for]").forEach((element) => {
+              fragment.querySelectorAll(
+                "[name], [id], label[for], [aria-describedby], [data-valmsg-for]"
+              ).forEach((element) => {
                 if (element.name) element.name = element.name.replaceAll("__index__", index);
                 if (element.id) element.id = element.id.replaceAll("__index__", index);
                 if (element.htmlFor) element.htmlFor = element.htmlFor.replaceAll("__index__", index);
+                if (element.hasAttribute("aria-describedby")) {
+                  element.setAttribute(
+                    "aria-describedby",
+                    element.getAttribute("aria-describedby").replaceAll("__index__", index)
+                  );
+                }
+                if (element.hasAttribute("data-valmsg-for")) {
+                  element.setAttribute(
+                    "data-valmsg-for",
+                    element.getAttribute("data-valmsg-for").replaceAll("__index__", index)
+                  );
+                }
               });
               const row = fragment.querySelector("[data-row]");
               wireRemove(row);
@@ -260,7 +313,10 @@ public static class AuthAssets
           loginForm?.addEventListener("reset", () => {
             window.setTimeout(() => {
               repeaters.forEach((restore) => restore());
-              document.querySelector(".advanced")?.removeAttribute("open");
+              const advanced = document.querySelector(".advanced");
+              if (!advanced?.querySelector(".field-validation-error")) {
+                advanced?.removeAttribute("open");
+              }
               resetTenantTracking();
             }, 0);
           });

@@ -19,6 +19,7 @@ public sealed class ProfileValidatorTests
             ProfileValidator.Create(configuration));
 
         Assert.Contains("control characters", exception.Message, StringComparison.Ordinal);
+        Assert.Equal("userName", exception.FieldPath);
     }
 
     [Fact]
@@ -29,8 +30,10 @@ public sealed class ProfileValidatorTests
             Claims = [new EasyAuthClaim("department", "Engineering\nResearch")]
         };
 
-        Assert.Throws<ProfileValidationException>(() =>
+        ProfileValidationException exception = Assert.Throws<ProfileValidationException>(() =>
             ProfileValidator.Create(configuration));
+
+        Assert.Equal("claims[0].val", exception.FieldPath);
     }
 
     [Theory]
@@ -47,6 +50,7 @@ public sealed class ProfileValidatorTests
             ProfileValidator.Create(configuration));
 
         Assert.Contains(field, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(field, exception.FieldPath);
     }
 
     [Theory]
@@ -111,8 +115,10 @@ public sealed class ProfileValidatorTests
             Claims = [new EasyAuthClaim("iss", "https://other.example")]
         };
 
-        Assert.Throws<ProfileValidationException>(() =>
+        ProfileValidationException exception = Assert.Throws<ProfileValidationException>(() =>
             ProfileValidator.Create(configuration));
+
+        Assert.Equal("issuer", exception.FieldPath);
     }
 
     [Fact]
@@ -132,8 +138,44 @@ public sealed class ProfileValidatorTests
             UserName = "alice@example.com"
         };
 
-        Assert.Throws<ProfileValidationException>(() =>
+        ProfileValidationException exception = Assert.Throws<ProfileValidationException>(() =>
             ProfileValidator.Create(configuration));
+
+        Assert.Equal("userName", exception.FieldPath);
+    }
+
+    [Fact]
+    public void IdentifiesEmptyRoleByIndex()
+    {
+        ProfileConfiguration configuration = CreateValidConfiguration() with
+        {
+            Roles = [string.Empty]
+        };
+
+        ProfileValidationException exception = Assert.Throws<ProfileValidationException>(() =>
+            ProfileValidator.Create(configuration));
+
+        Assert.Equal("roles[0]", exception.FieldPath);
+        Assert.Equal("roles[0] is required.", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(null, "value", "claims[0].typ")]
+    [InlineData("type", null, "claims[0].val")]
+    public void IdentifiesEmptyClaimField(
+        string? type,
+        string? value,
+        string expectedFieldPath)
+    {
+        ProfileConfiguration configuration = CreateValidConfiguration() with
+        {
+            Claims = [new EasyAuthClaim(type!, value!)]
+        };
+
+        ProfileValidationException exception = Assert.Throws<ProfileValidationException>(() =>
+            ProfileValidator.Create(configuration));
+
+        Assert.Equal(expectedFieldPath, exception.FieldPath);
     }
 
     [Fact]

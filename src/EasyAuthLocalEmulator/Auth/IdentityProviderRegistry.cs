@@ -113,6 +113,7 @@ public sealed class IdentityProviderRegistry
         return TryGet(routeKey, out IdentityProviderDefinition? provider)
             ? provider
             : throw new ProfileValidationException(
-                $"provider must be one of: {string.Join(", ", Providers.Select(item => item.RouteKey))}.");
+                $"provider must be one of: {string.Join(", ", Providers.Select(item => item.RouteKey))}.",
+                "provider");
     }
 }

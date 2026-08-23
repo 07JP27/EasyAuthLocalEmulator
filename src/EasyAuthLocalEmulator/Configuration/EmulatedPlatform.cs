@@ -10,6 +10,7 @@ public sealed record PlatformContract(
     EmulatedPlatform Platform,
     string CliValue,
     string DisplayName,
+    string UiDisplayName,
     string DefaultLogoutCompletePath);
 
 public static class PlatformContracts
@@ -22,12 +23,14 @@ public static class PlatformContracts
         EmulatedPlatform.AppService,
         AppServiceCliValue,
         "Azure App Service Easy Auth",
+        "Azure App Service",
         "/.auth/logout/complete");
 
     public static PlatformContract ContainerApps { get; } = new(
         EmulatedPlatform.ContainerApps,
         ContainerAppsCliValue,
         "Azure Container Apps authentication",
+        "Azure Container Apps",
         "/.auth/logout/done");
 
     public static PlatformContract Get(EmulatedPlatform platform)

@@ -1,14 +1,28 @@
 @page "/.auth/login/{provider}"
 @model EasyAuthLocalEmulator.Pages.Auth.LoginModel
 @{
-    ViewData["Title"] = "Local authentication";
+    ViewData["Title"] = "Sign in";
+
+    bool HasError(string fieldName) =>
+        ViewData.ModelState.TryGetValue(fieldName, out Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateEntry? entry) &&
+        entry.Errors.Count > 0;
+
+    string[] advancedFields =
+    [
+        "Input.AuthenticationType",
+        "Input.NameClaimType",
+        "Input.RoleClaimType",
+        "Input.DisplayNameClaimType",
+        "Input.UserNameClaimType",
+        "Input.UserIdClaimType",
+        "Input.TenantIdClaimType"
+    ];
+    bool hasAdvancedErrors = advancedFields.Any(HasError);
 }
 
 <header class="auth-header">
-    <p class="product-name">Easy Auth Local Emulator</p>
-    <p class="platform-name">Emulating: @Model.PlatformDisplayName</p>
-    <h1>Local authentication</h1>
-    <p>Create a development-only @Model.ProviderDisplayName identity for this local session. It cannot be used with external provider APIs.</p>
+    <h1>Easy Auth Local Emulator</h1>
+    <p class="login-platform-name">For: @Model.PlatformUiDisplayName</p>
 </header>
 
 <section class="auth-form" aria-labelledby="identity-heading">
@@ -18,25 +32,6 @@
         <label for="provider-name">Provider</label>
         <div class="control">
             <input id="provider-name" type="text" value="@Model.Provider" readonly aria-readonly="true" />
-            <p class="help">@Model.ProviderDisplayName</p>
-            <details class="provider-change">
-                <summary>Change provider</summary>
-                <nav aria-label="Identity providers">
-                    @foreach (EasyAuthLocalEmulator.Auth.IdentityProviderDefinition provider in Model.Providers)
-                    {
-                        string href = $"/.auth/login/{provider.RouteKey}";
-                        if (!string.IsNullOrEmpty(Model.PostLoginRedirectUri))
-                        {
-                            href += $"?post_login_redirect_uri={Uri.EscapeDataString(Model.PostLoginRedirectUri)}";
-                        }
-
-                        <a href="@href"
-                           aria-current="@(provider.RouteKey == Model.Provider ? "page" : null)">
-                            @provider.DisplayName
-                        </a>
-                    }
-                </nav>
-            </details>
         </div>
     </div>
 
@@ -68,97 +63,175 @@
     <form method="post" asp-route-provider="@Model.Provider" data-provider="@Model.Provider" id="identity-form">
         <input type="hidden" asp-for="PostLoginRedirectUri" />
 
-        <div asp-validation-summary="ModelOnly" class="form-message"></div>
-
         <div class="form-row">
             <label asp-for="Input.DisplayName"></label>
             <div class="control">
-                <input asp-for="Input.DisplayName" autocomplete="name" />
-                <span asp-validation-for="Input.DisplayName"></span>
+                <input asp-for="Input.DisplayName"
+                       autocomplete="name"
+                       aria-describedby="display-name-error"
+                       aria-invalid="@(HasError("Input.DisplayName") ? "true" : null)" />
+                <span id="display-name-error"
+                      asp-validation-for="Input.DisplayName"
+                      aria-live="polite"></span>
             </div>
         </div>
 
         <div class="form-row">
             <label asp-for="Input.UserName"></label>
             <div class="control">
-                <input asp-for="Input.UserName" autocomplete="username" />
-                <span asp-validation-for="Input.UserName"></span>
-                <p class="help">User name, login, or email address exposed to the application.</p>
+                <input asp-for="Input.UserName"
+                       autocomplete="username"
+                       aria-describedby="user-name-error user-name-help"
+                       aria-invalid="@(HasError("Input.UserName") ? "true" : null)" />
+                <span id="user-name-error"
+                      asp-validation-for="Input.UserName"
+                      aria-live="polite"></span>
+                <p id="user-name-help" class="help">User name, login, or email address exposed to the application.</p>
             </div>
         </div>
 
         <div class="form-row">
             <label asp-for="Input.UserId"></label>
             <div class="control">
-                <input asp-for="Input.UserId" spellcheck="false" />
-                <span asp-validation-for="Input.UserId"></span>
-                <p class="help">Unique identifier exposed in <code>X-MS-CLIENT-PRINCIPAL-ID</code>.</p>
+                <input asp-for="Input.UserId"
+                       spellcheck="false"
+                       aria-describedby="user-id-error user-id-help"
+                       aria-invalid="@(HasError("Input.UserId") ? "true" : null)" />
+                <span id="user-id-error"
+                      asp-validation-for="Input.UserId"
+                      aria-live="polite"></span>
+                <p id="user-id-help" class="help">Unique identifier exposed in <code>X-MS-CLIENT-PRINCIPAL-ID</code>.</p>
             </div>
         </div>
 
         <div class="form-row">
             <label asp-for="Input.TenantId"></label>
             <div class="control">
-                <input asp-for="Input.TenantId" spellcheck="false" />
-                <span asp-validation-for="Input.TenantId"></span>
-                <p class="help">Required for Microsoft Entra ID; optional for other providers.</p>
+                <input asp-for="Input.TenantId"
+                       spellcheck="false"
+                       aria-describedby="tenant-id-error tenant-id-help"
+                       aria-invalid="@(HasError("Input.TenantId") ? "true" : null)" />
+                <span id="tenant-id-error"
+                      asp-validation-for="Input.TenantId"
+                      aria-live="polite"></span>
+                <p id="tenant-id-help" class="help">Required for Microsoft Entra ID; optional for other providers.</p>
             </div>
         </div>
 
         <div class="form-row">
             <label asp-for="Input.Issuer"></label>
             <div class="control">
-                <input asp-for="Input.Issuer" spellcheck="false" />
-                <span asp-validation-for="Input.Issuer"></span>
-                <p class="help">Emitted as an <code>iss</code> claim. Leave blank to omit it.</p>
+                <input asp-for="Input.Issuer"
+                       spellcheck="false"
+                       aria-describedby="issuer-error issuer-help"
+                       aria-invalid="@(HasError("Input.Issuer") ? "true" : null)" />
+                <span id="issuer-error"
+                      asp-validation-for="Input.Issuer"
+                      aria-live="polite"></span>
+                <p id="issuer-help" class="help">Emitted as an <code>iss</code> claim. Leave blank to omit it.</p>
             </div>
         </div>
 
-        <fieldset class="form-row">
+        <fieldset class="form-row" aria-describedby="roles-error roles-help">
             <legend>Roles</legend>
             <div class="control">
                 <div id="roles" class="repeat-list" data-repeat data-template="role-template">
                     @for (int index = 0; index < Model.Input.Roles.Count; index++)
                     {
-                        <div class="repeat-row" data-row>
-                            <div>
-                                <label class="visually-hidden" for="Input_Roles_@(index)__">Role</label>
-                                <input id="Input_Roles_@(index)__" name="Input.Roles[@index]" value="@Model.Input.Roles[index]" />
-                            </div>
+                        string roleField = $"Input.Roles[{index}]";
+                        string roleInputId = $"Input_Roles_{index}__";
+                        string roleErrorId = $"{roleInputId}Error";
+
+                        <div class="repeat-row role-row" data-row>
+                            <label class="visually-hidden" for="@roleInputId">Role</label>
+                            <input id="@roleInputId"
+                                   name="@roleField"
+                                   value="@Model.Input.Roles[index]"
+                                   class="repeat-input @(HasError(roleField) ? "input-validation-error" : null)"
+                                   aria-describedby="@roleErrorId"
+                                   aria-invalid="@(HasError(roleField) ? "true" : null)" />
                             <button type="button" class="button remove" data-remove>Remove</button>
+                            @Html.ValidationMessage(
+                                roleField,
+                                null,
+                                new
+                                {
+                                    id = roleErrorId,
+                                    aria_live = "polite",
+                                    data_error_for = "role"
+                                })
                         </div>
                     }
                 </div>
+                @Html.ValidationMessage(
+                    "Input.Roles",
+                    null,
+                    new { id = "roles-error", aria_live = "polite" })
                 <button type="button" class="button add" data-add="roles">Add role</button>
-                <p class="help">Each role becomes a separate claim using the configured role claim type.</p>
+                <p id="roles-help" class="help">Each role becomes a separate claim using the configured role claim type.</p>
             </div>
         </fieldset>
 
-        <fieldset class="form-row">
+        <fieldset class="form-row" aria-describedby="claims-error claims-help">
             <legend>Custom claims</legend>
             <div class="control">
                 <div id="claims" class="repeat-list" data-repeat data-template="claim-template">
                     @for (int index = 0; index < Model.Input.Claims.Count; index++)
                     {
+                        string claimTypeField = $"Input.Claims[{index}].Type";
+                        string claimValueField = $"Input.Claims[{index}].Value";
+                        string claimTypeInputId = $"Input_Claims_{index}__Type";
+                        string claimValueInputId = $"Input_Claims_{index}__Value";
+                        string claimTypeErrorId = $"{claimTypeInputId}Error";
+                        string claimValueErrorId = $"{claimValueInputId}Error";
+
                         <div class="repeat-row claim-row" data-row>
-                            <div>
-                                <label for="Input_Claims_@(index)__Type">Type</label>
-                                <input id="Input_Claims_@(index)__Type" name="Input.Claims[@index].Type" value="@Model.Input.Claims[index].Type" />
-                            </div>
-                            <div>
-                                <label for="Input_Claims_@(index)__Value">Value</label>
-                                <input id="Input_Claims_@(index)__Value" name="Input.Claims[@index].Value" value="@Model.Input.Claims[index].Value" />
-                            </div>
+                            <label class="claim-type-label" for="@claimTypeInputId">Type</label>
+                            <input id="@claimTypeInputId"
+                                   name="@claimTypeField"
+                                   value="@Model.Input.Claims[index].Type"
+                                   class="claim-type-input @(HasError(claimTypeField) ? "input-validation-error" : null)"
+                                   aria-describedby="@claimTypeErrorId"
+                                   aria-invalid="@(HasError(claimTypeField) ? "true" : null)" />
+                            @Html.ValidationMessage(
+                                claimTypeField,
+                                null,
+                                new
+                                {
+                                    id = claimTypeErrorId,
+                                    aria_live = "polite",
+                                    data_error_for = "claim-type"
+                                })
+                            <label class="claim-value-label" for="@claimValueInputId">Value</label>
+                            <input id="@claimValueInputId"
+                                   name="@claimValueField"
+                                   value="@Model.Input.Claims[index].Value"
+                                   class="claim-value-input @(HasError(claimValueField) ? "input-validation-error" : null)"
+                                   aria-describedby="@claimValueErrorId"
+                                   aria-invalid="@(HasError(claimValueField) ? "true" : null)" />
+                            @Html.ValidationMessage(
+                                claimValueField,
+                                null,
+                                new
+                                {
+                                    id = claimValueErrorId,
+                                    aria_live = "polite",
+                                    data_error_for = "claim-value"
+                                })
                             <button type="button" class="button remove" data-remove>Remove</button>
                         </div>
                     }
                 </div>
+                @Html.ValidationMessage(
+                    "Input.Claims",
+                    null,
+                    new { id = "claims-error", aria_live = "polite" })
                 <button type="button" class="button add" data-add="claims">Add claim</button>
-                <p class="help">Duplicate claim types are preserved in the order entered.</p>
+                <p id="claims-help" class="help">Duplicate claim types are preserved in the order entered.</p>
             </div>
         </fieldset>
 
-        <details class="advanced">
+        <details class="advanced" open="@(hasAdvancedErrors ? "open" : null)">
             <summary>
                 <span class="disclosure-marker" aria-hidden="true"></span>
                 <span>Advanced compatibility settings</span>
@@ -167,35 +240,95 @@
             <div class="advanced-fields">
                 <div class="form-row">
                     <label asp-for="Input.AuthenticationType"></label>
-                    <div class="control"><input asp-for="Input.AuthenticationType" spellcheck="false" /></div>
+                    <div class="control">
+                        <input asp-for="Input.AuthenticationType"
+                               spellcheck="false"
+                               aria-describedby="authentication-type-error"
+                               aria-invalid="@(HasError("Input.AuthenticationType") ? "true" : null)" />
+                        <span id="authentication-type-error"
+                              asp-validation-for="Input.AuthenticationType"
+                              aria-live="polite"></span>
+                    </div>
                 </div>
                 <div class="form-row">
                     <label asp-for="Input.NameClaimType"></label>
-                    <div class="control"><input asp-for="Input.NameClaimType" spellcheck="false" /></div>
+                    <div class="control">
+                        <input asp-for="Input.NameClaimType"
+                               spellcheck="false"
+                               aria-describedby="name-claim-type-error"
+                               aria-invalid="@(HasError("Input.NameClaimType") ? "true" : null)" />
+                        <span id="name-claim-type-error"
+                              asp-validation-for="Input.NameClaimType"
+                              aria-live="polite"></span>
+                    </div>
                 </div>
                 <div class="form-row">
                     <label asp-for="Input.RoleClaimType"></label>
-                    <div class="control"><input asp-for="Input.RoleClaimType" spellcheck="false" /></div>
+                    <div class="control">
+                        <input asp-for="Input.RoleClaimType"
+                               spellcheck="false"
+                               aria-describedby="role-claim-type-error"
+                               aria-invalid="@(HasError("Input.RoleClaimType") ? "true" : null)" />
+                        <span id="role-claim-type-error"
+                              asp-validation-for="Input.RoleClaimType"
+                              aria-live="polite"></span>
+                    </div>
                 </div>
                 <div class="form-row">
                     <label asp-for="Input.DisplayNameClaimType"></label>
-                    <div class="control"><input asp-for="Input.DisplayNameClaimType" spellcheck="false" /></div>
+                    <div class="control">
+                        <input asp-for="Input.DisplayNameClaimType"
+                               spellcheck="false"
+                               aria-describedby="display-name-claim-type-error"
+                               aria-invalid="@(HasError("Input.DisplayNameClaimType") ? "true" : null)" />
+                        <span id="display-name-claim-type-error"
+                              asp-validation-for="Input.DisplayNameClaimType"
+                              aria-live="polite"></span>
+                    </div>
                 </div>
                 <div class="form-row">
                     <label asp-for="Input.UserNameClaimType"></label>
-                    <div class="control"><input asp-for="Input.UserNameClaimType" spellcheck="false" /></div>
+                    <div class="control">
+                        <input asp-for="Input.UserNameClaimType"
+                               spellcheck="false"
+                               aria-describedby="user-name-claim-type-error"
+                               aria-invalid="@(HasError("Input.UserNameClaimType") ? "true" : null)" />
+                        <span id="user-name-claim-type-error"
+                              asp-validation-for="Input.UserNameClaimType"
+                              aria-live="polite"></span>
+                    </div>
                 </div>
                 <div class="form-row">
                     <label asp-for="Input.UserIdClaimType"></label>
-                    <div class="control"><input asp-for="Input.UserIdClaimType" spellcheck="false" /></div>
+                    <div class="control">
+                        <input asp-for="Input.UserIdClaimType"
+                               spellcheck="false"
+                               aria-describedby="user-id-claim-type-error"
+                               aria-invalid="@(HasError("Input.UserIdClaimType") ? "true" : null)" />
+                        <span id="user-id-claim-type-error"
+                              asp-validation-for="Input.UserIdClaimType"
+                              aria-live="polite"></span>
+                    </div>
                 </div>
                 <div class="form-row">
                     <label asp-for="Input.TenantIdClaimType"></label>
-                    <div class="control"><input asp-for="Input.TenantIdClaimType" spellcheck="false" /></div>
+                    <div class="control">
+                        <input asp-for="Input.TenantIdClaimType"
+                               spellcheck="false"
+                               aria-describedby="tenant-id-claim-type-error"
+                               aria-invalid="@(HasError("Input.TenantIdClaimType") ? "true" : null)" />
+                        <span id="tenant-id-claim-type-error"
+                              asp-validation-for="Input.TenantIdClaimType"
+                              aria-live="polite"></span>
+                    </div>
                 </div>
             </div>
             <p class="help advanced-help">Blank claim mappings suppress the corresponding convenience claim.</p>
         </details>
+
+        <div asp-validation-summary="ModelOnly"
+             class="form-message"
+             role="alert"></div>
 
         <div class="form-actions">
             <button type="reset" class="button secondary">Reset</button>
@@ -206,25 +339,46 @@
 </section>
 
 <template id="role-template">
-    <div class="repeat-row" data-row>
-        <div>
-            <label class="visually-hidden" for="Input_Roles___index____">Role</label>
-            <input id="Input_Roles___index____" name="Input.Roles[__index__]" />
-        </div>
+    <div class="repeat-row role-row" data-row>
+        <label class="visually-hidden" for="Input_Roles___index____">Role</label>
+        <input id="Input_Roles___index____"
+               name="Input.Roles[__index__]"
+               class="repeat-input"
+               aria-describedby="Input_Roles___index____Error" />
         <button type="button" class="button remove" data-remove>Remove</button>
+        <span id="Input_Roles___index____Error"
+              class="field-validation-valid"
+              data-valmsg-for="Input.Roles[__index__]"
+              data-valmsg-replace="true"
+              data-error-for="role"
+              aria-live="polite"></span>
     </div>
 </template>
 
 <template id="claim-template">
     <div class="repeat-row claim-row" data-row>
-        <div>
-            <label for="Input_Claims___index____Type">Type</label>
-            <input id="Input_Claims___index____Type" name="Input.Claims[__index__].Type" />
-        </div>
-        <div>
-            <label for="Input_Claims___index____Value">Value</label>
-            <input id="Input_Claims___index____Value" name="Input.Claims[__index__].Value" />
-        </div>
+        <label class="claim-type-label" for="Input_Claims___index____Type">Type</label>
+        <input id="Input_Claims___index____Type"
+               name="Input.Claims[__index__].Type"
+               class="claim-type-input"
+               aria-describedby="Input_Claims___index____TypeError" />
+        <span id="Input_Claims___index____TypeError"
+              class="field-validation-valid"
+              data-valmsg-for="Input.Claims[__index__].Type"
+              data-valmsg-replace="true"
+              data-error-for="claim-type"
+              aria-live="polite"></span>
+        <label class="claim-value-label" for="Input_Claims___index____Value">Value</label>
+        <input id="Input_Claims___index____Value"
+               name="Input.Claims[__index__].Value"
+               class="claim-value-input"
+               aria-describedby="Input_Claims___index____ValueError" />
+        <span id="Input_Claims___index____ValueError"
+              class="field-validation-valid"
+              data-valmsg-for="Input.Claims[__index__].Value"
+              data-valmsg-replace="true"
+              data-error-for="claim-value"
+              aria-live="polite"></span>
         <button type="button" class="button remove" data-remove>Remove</button>
     </div>
 </template>

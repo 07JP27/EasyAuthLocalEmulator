@@ -60,6 +60,7 @@ public sealed class PrincipalBuilderTests
             _builder.Build(profile));
 
         Assert.Contains("cannot exceed", exception.Message, StringComparison.Ordinal);
+        Assert.Null(exception.FieldPath);
     }
 
     [Fact]
@@ -79,7 +80,10 @@ public sealed class PrincipalBuilderTests
             [],
             []);
 
-        Assert.Throws<ProfileValidationException>(() => _builder.Build(profile));
+        ProfileValidationException exception =
+            Assert.Throws<ProfileValidationException>(() => _builder.Build(profile));
+
+        Assert.Equal("userName", exception.FieldPath);
     }
 
     [Theory]

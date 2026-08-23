@@ -63,18 +63,22 @@ public sealed class NoUiAndFailureTests(BrowserFixture fixture) : PageTest
     [InlineData(
         null,
         "Azure App Service Easy Auth",
+        "Azure App Service",
         "/.auth/logout/complete")]
     [InlineData(
         "app-service",
         "Azure App Service Easy Auth",
+        "Azure App Service",
         "/.auth/logout/complete")]
     [InlineData(
         "container-apps",
         "Azure Container Apps authentication",
+        "Azure Container Apps",
         "/.auth/logout/done")]
-    public async Task PlatformControlsLabelsAndDefaultLogout(
+    public async Task PlatformControlsStartupAndDefaultLogout(
         string? platform,
         string displayName,
+        string uiDisplayName,
         string expectedLogoutPath)
     {
         await using EmulatorProcess emulator = await EmulatorProcess.StartAsync(
@@ -89,9 +93,18 @@ public sealed class NoUiAndFailureTests(BrowserFixture fixture) : PageTest
 
         IAPIResponse loginPage = await Page.APIRequest.GetAsync(
             new Uri(emulator.BaseUri, "/.auth/login/aad").AbsoluteUri);
+        string loginHtml = await loginPage.TextAsync();
         Assert.Contains(
-            $"Emulating: {displayName}",
-            await loginPage.TextAsync(),
+            "<h1>Easy Auth Local Emulator</h1>",
+            loginHtml,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            $"<p class=\"login-platform-name\">For: {uiDisplayName}</p>",
+            loginHtml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Local authentication",
+            loginHtml,
             StringComparison.Ordinal);
 
         IAPIResponse logout = await Page.APIRequest.GetAsync(

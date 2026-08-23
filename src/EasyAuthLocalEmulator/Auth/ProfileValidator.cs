@@ -31,7 +31,9 @@ public static class ProfileValidator
         {
             userId = NormalizeGuid(userId, "userId");
             tenantId = NormalizeGuid(
-                tenantId ?? throw new ProfileValidationException("tenantId is required."),
+                tenantId ?? throw new ProfileValidationException(
+                    "tenantId is required.",
+                    "tenantId"),
                 "tenantId");
         }
 
@@ -73,7 +75,8 @@ public static class ProfileValidator
         if (value.Any(char.IsControl))
         {
             throw new ProfileValidationException(
-                $"{field} cannot contain control characters.");
+                $"{field} cannot contain control characters.",
+                field);
         }
     }
 
@@ -82,7 +85,8 @@ public static class ProfileValidator
         if (configuration.UserName is not null && configuration.Upn is not null)
         {
             throw new ProfileValidationException(
-                "userName and the legacy upn property cannot both be specified.");
+                "userName and the legacy upn property cannot both be specified.",
+                "userName");
         }
 
         return Required(
@@ -149,13 +153,15 @@ public static class ProfileValidator
         if (issuerClaims.Length > 1)
         {
             throw new ProfileValidationException(
-                "claims cannot contain more than one iss claim.");
+                "claims cannot contain more than one iss claim.",
+                "claims");
         }
 
         if (configuredIssuer is not null && issuerClaims.Length > 0)
         {
             throw new ProfileValidationException(
-                "issuer and a custom iss claim cannot both be specified.");
+                "issuer and a custom iss claim cannot both be specified.",
+                "issuer");
         }
 
         string? issuer;
@@ -189,7 +195,8 @@ public static class ProfileValidator
             !string.IsNullOrEmpty(uri.Fragment))
         {
             throw new ProfileValidationException(
-                "issuer must be an absolute HTTP or HTTPS URI without user info or a fragment.");
+                "issuer must be an absolute HTTP or HTTPS URI without user info or a fragment.",
+                "issuer");
         }
 
         return normalized;
@@ -199,13 +206,14 @@ public static class ProfileValidator
     {
         if (configuredRoles is null)
         {
-            throw new ProfileValidationException("roles cannot be null.");
+            throw new ProfileValidationException("roles cannot be null.", "roles");
         }
 
         if (configuredRoles.Count > MaximumRoles)
         {
             throw new ProfileValidationException(
-                $"roles cannot contain more than {MaximumRoles} entries.");
+                $"roles cannot contain more than {MaximumRoles} entries.",
+                "roles");
         }
 
         return configuredRoles
@@ -217,13 +225,14 @@ public static class ProfileValidator
     {
         if (configuredClaims is null)
         {
-            throw new ProfileValidationException("claims cannot be null.");
+            throw new ProfileValidationException("claims cannot be null.", "claims");
         }
 
         if (configuredClaims.Count > MaximumClaims)
         {
             throw new ProfileValidationException(
-                $"claims cannot contain more than {MaximumClaims} entries.");
+                $"claims cannot contain more than {MaximumClaims} entries.",
+                "claims");
         }
 
         return configuredClaims
@@ -235,19 +244,24 @@ public static class ProfileValidator
     {
         if (claim is null)
         {
-            throw new ProfileValidationException($"claims[{index}] cannot be null.");
+            throw new ProfileValidationException(
+                $"claims[{index}] cannot be null.",
+                $"claims[{index}]");
         }
 
         string type = Required(claim.Type, $"claims[{index}].typ", 512);
         string value = claim.Value
-            ?? throw new ProfileValidationException($"claims[{index}].val is required.");
+            ?? throw new ProfileValidationException(
+                $"claims[{index}].val is required.",
+                $"claims[{index}].val");
 
         RejectControlCharacters(value, $"claims[{index}].val");
 
         if (value.Length > 4096)
         {
             throw new ProfileValidationException(
-                $"claims[{index}].val cannot exceed 4096 characters.");
+                $"claims[{index}].val cannot exceed 4096 characters.",
+                $"claims[{index}].val");
         }
 
         return new EasyAuthClaim(type, value);
@@ -257,7 +271,9 @@ public static class ProfileValidator
     {
         return Guid.TryParse(value, out Guid parsed)
             ? parsed.ToString("D")
-            : throw new ProfileValidationException($"{field} must be a GUID for provider aad.");
+            : throw new ProfileValidationException(
+                $"{field} must be a GUID for provider aad.",
+                field);
     }
 
     private static string OptionalOrDefault(
@@ -282,7 +298,7 @@ public static class ProfileValidator
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new ProfileValidationException($"{field} is required.");
+            throw new ProfileValidationException($"{field} is required.", field);
         }
 
         string normalized = value.Trim();
@@ -291,7 +307,8 @@ public static class ProfileValidator
         if (normalized.Length > maximumLength)
         {
             throw new ProfileValidationException(
-                $"{field} cannot exceed {maximumLength} characters.");
+                $"{field} cannot exceed {maximumLength} characters.",
+                field);
         }
 
         return normalized;

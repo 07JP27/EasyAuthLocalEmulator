@@ -13,6 +13,25 @@ public sealed class LoginModel(
     RedirectUriValidator redirectValidator,
     IdentityProviderRegistry providerRegistry) : PageModel
 {
+    private static readonly Dictionary<string, string> ValidationFieldKeys =
+        new(StringComparer.Ordinal)
+        {
+            ["displayName"] = "Input.DisplayName",
+            ["userName"] = "Input.UserName",
+            ["userId"] = "Input.UserId",
+            ["tenantId"] = "Input.TenantId",
+            ["issuer"] = "Input.Issuer",
+            ["authenticationType"] = "Input.AuthenticationType",
+            ["nameClaimType"] = "Input.NameClaimType",
+            ["roleClaimType"] = "Input.RoleClaimType",
+            ["claimMappings.displayName"] = "Input.DisplayNameClaimType",
+            ["claimMappings.userName"] = "Input.UserNameClaimType",
+            ["claimMappings.userId"] = "Input.UserIdClaimType",
+            ["claimMappings.tenantId"] = "Input.TenantIdClaimType",
+            ["roles"] = "Input.Roles",
+            ["claims"] = "Input.Claims"
+        };
+
     [BindProperty]
     public LoginProfileInput Input { get; set; } = new();
 
@@ -21,16 +40,11 @@ public sealed class LoginModel(
 
     public string Provider { get; private set; } = "aad";
 
-    public string ProviderDisplayName { get; private set; } = "Microsoft Entra ID";
-
-    public string PlatformDisplayName => options.PlatformDisplayName;
+    public string PlatformUiDisplayName => options.PlatformUiDisplayName;
 
     public string? SelectedPresetName { get; private set; }
 
     public IReadOnlyList<string> ProfileNames { get; private set; } = [];
-
-    public IReadOnlyList<IdentityProviderDefinition> Providers =>
-        providerRegistry.Providers;
 
     public IActionResult OnGet(
         string provider,
@@ -109,7 +123,7 @@ public sealed class LoginModel(
                 out string redirectUri))
         {
             ModelState.AddModelError(
-                nameof(PostLoginRedirectUri),
+                string.Empty,
                 "The post-login redirect URI must be a local path.");
         }
 
@@ -125,7 +139,11 @@ public sealed class LoginModel(
             }
             catch (ProfileValidationException exception)
             {
-                ModelState.AddModelError(string.Empty, exception.Message);
+                string fieldKey = ResolveValidationFieldKey(exception.FieldPath)
+                    ?? string.Empty;
+                ModelState.AddModelError(
+                    fieldKey,
+                    ResolveValidationMessage(exception));
             }
         }
 
@@ -149,8 +167,100 @@ public sealed class LoginModel(
         }
 
         Provider = definition.RouteKey;
-        ProviderDisplayName = definition.DisplayName;
         return true;
+    }
+
+    private static string? ResolveValidationFieldKey(string? fieldPath)
+    {
+        if (fieldPath is null)
+        {
+            return null;
+        }
+
+        if (ValidationFieldKeys.TryGetValue(fieldPath, out string? fieldKey))
+        {
+            return fieldKey;
+        }
+
+        if (fieldPath.StartsWith("roles[", StringComparison.Ordinal))
+        {
+            return $"Input.Roles{fieldPath["roles".Length..]}";
+        }
+
+        if (!fieldPath.StartsWith("claims[", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string suffix = fieldPath["claims".Length..];
+        if (suffix.EndsWith(".typ", StringComparison.Ordinal))
+        {
+            return $"Input.Claims{suffix[..^4]}.Type";
+        }
+
+        if (suffix.EndsWith(".val", StringComparison.Ordinal))
+        {
+            return $"Input.Claims{suffix[..^4]}.Value";
+        }
+
+        return "Input.Claims";
+    }
+
+    private static string ResolveValidationMessage(
+        ProfileValidationException exception)
+    {
+        string? fieldPath = exception.FieldPath;
+        if (fieldPath is null)
+        {
+            return exception.Message;
+        }
+
+        if (fieldPath.StartsWith("roles[", StringComparison.Ordinal))
+        {
+            return HumanizeRepeaterMessage(
+                exception.Message,
+                fieldPath,
+                "Role",
+                "Enter a role, or remove this row.");
+        }
+
+        if (fieldPath.StartsWith("claims[", StringComparison.Ordinal) &&
+            fieldPath.EndsWith(".typ", StringComparison.Ordinal))
+        {
+            return HumanizeRepeaterMessage(
+                exception.Message,
+                fieldPath,
+                "Claim type",
+                "Enter a claim type, or remove this row.");
+        }
+
+        if (fieldPath.StartsWith("claims[", StringComparison.Ordinal) &&
+            fieldPath.EndsWith(".val", StringComparison.Ordinal))
+        {
+            return HumanizeRepeaterMessage(
+                exception.Message,
+                fieldPath,
+                "Claim value",
+                "Enter a claim value, or remove this row.");
+        }
+
+        return exception.Message;
+    }
+
+    private static string HumanizeRepeaterMessage(
+        string message,
+        string fieldPath,
+        string fieldLabel,
+        string requiredMessage)
+    {
+        if (message.Equals($"{fieldPath} is required.", StringComparison.Ordinal))
+        {
+            return requiredMessage;
+        }
+
+        return message.StartsWith(fieldPath, StringComparison.Ordinal)
+            ? $"{fieldLabel}{message[fieldPath.Length..]}"
+            : message;
     }
 
     private void PopulateProfiles()

@@ -22,6 +22,8 @@ public sealed record EmulatorOptions(
 
     public string PlatformDisplayName => PlatformContract.DisplayName;
 
+    public string PlatformUiDisplayName => PlatformContract.UiDisplayName;
+
     public string DefaultLogoutCompletePath =>
         PlatformContract.DefaultLogoutCompletePath;
 }
