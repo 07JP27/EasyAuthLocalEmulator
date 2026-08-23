@@ -197,6 +197,37 @@ App Service の file-based configuration には次が含まれる。[^ms-file-co
 5. same-origin redirect 制約
 6. HTTPS と forward headers
 
+### 3.4 複数 IdP と issuer
+
+App Service が公式に提供する組み込み IdP とログイン URL は次のとおりである。[^ms-overview]
+
+| IdP | ログイン URL |
+|---|---|
+| Microsoft Entra ID | `/.auth/login/aad` |
+| Facebook | `/.auth/login/facebook` |
+| Google | `/.auth/login/google` |
+| X | `/.auth/login/x` |
+| GitHub | `/.auth/login/github` |
+| Apple | `/.auth/login/apple` |
+| 任意の OpenID Connect | `/.auth/login/<providerName>` |
+
+本エミュレーターの初版では、上記の組み込み6種類を対象とし、任意の OpenID Connect は対象外とする。
+
+#### 確定している契約
+
+- `X-MS-CLIENT-PRINCIPAL` のトップレベル項目は `auth_typ`, `claims`, `name_typ`, `role_typ` であり、`issuer` は含まれない。[^ms-user]
+- `/.auth/me` の既知のトップレベル項目は `provider_name`, `user_id`, `user_claims` と provider token 関連項目であり、既存資料と観測例には `issuer` という項目はない。[^gillum-token-store][^easyauth-live-capture]
+- issuer は、トークンに存在する場合、`claims` / `user_claims` 配列内の `{ "typ": "iss", "val": "..." }` として表現される。Microsoft Entra ID の `iss` はトークン発行者を表す URI である。[^ms-id-token-claims][^easyauth-live-capture]
+- X の公式ログイン URL は `/.auth/login/x` だが、App Service の設定キーと token header は従来名の `twitter` / `X-MS-TOKEN-TWITTER-*` を使用する。[^ms-overview][^ms-tokens][^ms-file-config]
+
+#### 公式文書だけでは確定できない項目
+
+- X の `auth_typ`, `X-MS-CLIENT-PRINCIPAL-IDP`, `/.auth/me.provider_name` が `x` か `twitter` か。
+- Facebook, Google, X, GitHub, Apple の App Service による完全な claim mapping。
+- 未認証時や token store 無効時の `/.auth/me` の厳密な応答。
+
+したがって実装では、ログイン URL を公式表どおり固定する一方、`authenticationType` と convenience field の claim mapping をプロファイル設定で上書き可能にする。X の既定 `authenticationType` は `x` とし、必要な利用者は `twitter` へ変更できる。issuer 入力欄は全 IdP に用意するが、公式に issuer を確認できる AAD, Google, Apple だけ初期値を設定し、Facebook, X, GitHub は空欄とする。
+
 ## 4. 既存ツール調査
 
 ### 4.1 `pnopjp/easyauth-emulator`
@@ -653,3 +684,5 @@ echo upstream を起動し、次を確認する。
 [^yarp-websocket]: Microsoft Learn, [YARP Proxying WebSockets and SPDY](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/yarp/websockets?view=aspnetcore-10.0)
 [^dotnet-single]: Microsoft Learn, [.NET single-file deployment](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
 [^owasp-session]: OWASP Cheat Sheet Series, [Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+[^ms-id-token-claims]: Microsoft Learn, [ID token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference)（`iss` は token issuer / authorization server を示す URI）
+[^easyauth-live-capture]: Icefire555, [Easy Auth Header Decoding – Quick Reference Guide](https://icefire555.com/easy-auth-header-decoding-quick-reference-guide/)（2025 年の App Service 応答例。`/.auth/me.user_claims` 内の `iss` を確認するための観測資料であり、公式契約ではない）

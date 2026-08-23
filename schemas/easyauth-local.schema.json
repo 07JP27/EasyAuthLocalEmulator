@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/07JP27/EasyAuthLocalEmulator/main/schemas/easyauth-local.schema.json",
+  "title": "EasyAuth Local Emulator configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "sessionLifetime": {
+      "type": "string",
+      "pattern": "^(?!(?:0\\.)?00:00:[0-5][0-9]$)(?:(?:[0-6]\\.)?(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]|7\\.00:00:00)$",
+      "default": "08:00:00",
+      "description": "Session lifetime. Runtime validation limits this value to 1 minute through 7 days."
+    },
+    "profiles": {
+      "type": "object",
+      "default": {},
+      "propertyNames": {
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^\\S(?:.*\\S)?$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/profile"
+      }
+    }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName",
+        "userId"
+      ],
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "userName"
+              ],
+              "not": {
+                "required": [
+                  "upn"
+                ]
+              }
+            },
+            {
+              "required": [
+                "upn"
+              ],
+              "not": {
+                "required": [
+                  "userName"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "if": {
+            "anyOf": [
+              {
+                "not": {
+                  "required": [
+                    "provider"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "provider"
+                ],
+                "properties": {
+                  "provider": {
+                    "const": "aad"
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "tenantId"
+            ],
+            "properties": {
+              "userId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "tenantId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "aad",
+            "facebook",
+            "google",
+            "x",
+            "github",
+            "apple"
+          ],
+          "default": "aad"
+        },
+        "authenticationType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "userName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 320,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "upn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 320,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "deprecated": true
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "issuer": {
+          "anyOf": [
+            {
+              "const": ""
+            },
+            {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 2048,
+              "pattern": "^https?://[^#\\u0000-\\u001F\\u007F]+$",
+              "not": {
+                "pattern": "^https?://[^/]*@"
+              }
+            }
+          ]
+        },
+        "nameClaimType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "roleClaimType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "claimMappings": {
+          "$ref": "#/$defs/claimMappings"
+        },
+        "roles": {
+          "type": "array",
+          "maxItems": 100,
+          "default": [],
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "claims": {
+          "type": "array",
+          "maxItems": 256,
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/claim"
+          }
+        }
+      }
+    },
+    "claimMappings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "$ref": "#/$defs/claimMapping"
+        },
+        "userName": {
+          "$ref": "#/$defs/claimMapping"
+        },
+        "userId": {
+          "$ref": "#/$defs/claimMapping"
+        },
+        "tenantId": {
+          "$ref": "#/$defs/claimMapping"
+        }
+      }
+    },
+    "claimMapping": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 512,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]*$"
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "typ",
+        "val"
+      ],
+      "properties": {
+        "typ": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "val": {
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]*$"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · Easy Auth Local Emulator</title>
+    <link rel="stylesheet" href="/.auth/assets/site.css" />
+</head>
+<body>
+    <main class="shell">
+        @RenderBody()
+        <footer>Local development only · Always verify authentication behavior in Azure.</footer>
+    </main>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,23 @@
+@page "/.auth/logout/complete"
+@model EasyAuthLocalEmulator.Pages.Auth.LogoutCompleteModel
+@{
+    ViewData["Title"] = "Signed out";
+}
+
+<header class="auth-header">
+    <p class="product-name">Easy Auth Local Emulator</p>
+    <h1>Signed out</h1>
+    <p>The local session has been cleared. Return to the proxied application or sign in with another identity.</p>
+</header>
+
+<section class="logout-content">
+    <div class="actions">
+        <a class="button primary" href="/">Open proxied application</a>
+        @foreach (EasyAuthLocalEmulator.Auth.IdentityProviderDefinition provider in Model.Providers)
+        {
+            <a class="button secondary" href="/.auth/login/@provider.RouteKey">
+                Sign in with @provider.DisplayName
+            </a>
+        }
+    </div>
+</section>
