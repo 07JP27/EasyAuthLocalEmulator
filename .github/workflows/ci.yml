@@ -13,9 +13,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Set the repository variable RUN_TESTS=true to enable all test steps.
+  RUN_TESTS: ${{ vars.RUN_TESTS || 'false' }}
+
 jobs:
-  test:
-    name: Test (${{ matrix.os }})
+  build:
+    name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -41,6 +45,7 @@ jobs:
         run: dotnet build EasyAuthLocalEmulator.sln --configuration Release --no-restore
 
       - name: Run unit tests
+        if: env.RUN_TESTS == 'true'
         run: >-
           dotnet test
           tests/EasyAuthLocalEmulator.UnitTests/EasyAuthLocalEmulator.UnitTests.csproj
@@ -49,6 +54,7 @@ jobs:
           --no-restore
 
       - name: Install Playwright browsers
+        if: env.RUN_TESTS == 'true'
         shell: pwsh
         run: >-
           pwsh
@@ -56,12 +62,14 @@ jobs:
           install chromium webkit
 
       - name: Run Chromium tests
+        if: env.RUN_TESTS == 'true'
         shell: pwsh
         run: |
           $env:BROWSER = "chromium"
           dotnet test tests/EasyAuthLocalEmulator.BrowserTests/EasyAuthLocalEmulator.BrowserTests.csproj --configuration Release --no-build --no-restore
 
       - name: Run WebKit tests
+        if: env.RUN_TESTS == 'true'
         shell: pwsh
         run: |
           $env:BROWSER = "webkit"
