@@ -228,6 +228,58 @@ App Service が公式に提供する組み込み IdP とログイン URL は次�
 
 したがって実装では、ログイン URL を公式表どおり固定する一方、`authenticationType` と convenience field の claim mapping をプロファイル設定で上書き可能にする。X の既定 `authenticationType` は `x` とし、必要な利用者は `twitter` へ変更できる。issuer 入力欄は全 IdP に用意するが、公式に issuer を確認できる AAD, Google, Apple だけ初期値を設定し、Facebook, X, GitHub は空欄とする。
 
+### 3.5 App Service と Azure Container Apps の差分追記（2026-08-23）
+
+Azure Container Apps は App Service と同じ認証・認可システムを使うが、公開文書、ARM スキーマ、Azure CLI を比較すると次の差分がある。[^ms-container][^ms-container-token-store][^aca-auth-arm][^appservice-auth-arm][^aca-auth-cli][^webapp-auth-cli]
+
+#### 確認済みの差分
+
+| 項目 | App Service | Azure Container Apps |
+|---|---|---|
+| 既定の logout 完了 URL | `/.auth/logout/complete` | `/.auth/logout/done` |
+| `unauthenticatedClientAction.Return404` | 概念文書と CLI にあり | 概念文書・CLI ともになし |
+| `globalValidation.requireAuthentication` | ARM スキーマにあり | ARM スキーマになし |
+| `login.tokenStore.fileSystem` | ARM スキーマにあり | ARM スキーマになし |
+| `encryptionSettings` | ARM スキーマになし | 署名・暗号化 secret 名を指定する項目あり |
+| `legacyMicrosoftAccount` | ARM スキーマにあり | ARM スキーマになし |
+| token refresh extension の専用 CLI 引数 | `az webapp auth update` にあり | `az containerapp auth update` になし |
+| legacy V1 / V2 CLI | `auth-classic`, `config-version` あり | なし |
+
+App Service の `Return404` は概念文書と CLI では確認できる一方、ARM スキーマの enum には反映されていない。これは Azure REST API specification の既知の不一致として報告されている。[^appservice-return404-spec-gap]
+
+#### 公式文書間の不一致
+
+- Apple は App Service の概念文書、ARM、CLI に存在する。
+- ACA の概念文書と専用 how-to には Apple がないが、ACA の ARM スキーマと `az containerapp auth apple` には存在する。
+- ACA の `platform.configFilePath` は ARM スキーマにないが、`az containerapp auth update --config-file-path` は存在する。
+- ACA の client-directed login 表には `microsoftaccount` があるが、対応する ARM provider 項目や専用 CLI group は確認できない。
+- App Service 文書は GitHub provider の customized sign-in / sign-out を非対応と明記するが、ACA 文書には同じ制限の記載がない。実動作差か文書差かは未確認。
+
+実装では技術面の証拠がある Apple を両モードで利用可能にし、`microsoftaccount` は追加しない。
+
+#### ACA 文書で独立確認できない項目
+
+- App Service 文書にある8時間 session / 72時間 grace period と同じ数値。
+- `/.auth/me` の完全な JSON スキーマと未認証時の応答。
+- `AppServiceAuthSession` という Cookie 名。
+- 非 AAD の完全な claim mapping。
+- App Service の preview 機能である Protected Resource Metadata (`/.well-known/oauth-protected-resource`) に相当する ACA 文書・設定。
+
+同じ認証エンジンであることから共通動作が期待されるが、証拠のない platform 差分は追加しない。
+
+#### 実装方針
+
+現在の fake profile / no-token emulator で利用者が観測できる確定差分は、platform 表示と既定 logout 完了 URL である。
+
+- `--platform app-service`: `/.auth/logout/complete`
+- `--platform container-apps`: `/.auth/logout/done`
+
+principal、4つの `X-MS-CLIENT-PRINCIPAL*`、IdP、`/.auth/me`、セッション、プロキシは共有する。`Return404`、`requireAuthentication`、token store、`encryptionSettings` は、将来対応設定を実装するときの platform 制約として扱う。
+
+Protected Resource Metadata は実 token / MCP resource metadata を扱う機能であり、現在の fake-profile emulator の対象外とする。GitHub の customized sign-in / sign-out も、現状の模擬 GET ログインとは別機能なので runtime 分岐を追加しない。
+
+ACA 固有の運用上の注意として、SPA のクライアント側ルーターが `/.auth/login/*` を横取りすると sidecar に届かないことが公式文書に明記されている。[^ms-container]
+
 ## 4. 既存ツール調査
 
 ### 4.1 `pnopjp/easyauth-emulator`
@@ -686,3 +738,9 @@ echo upstream を起動し、次を確認する。
 [^owasp-session]: OWASP Cheat Sheet Series, [Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 [^ms-id-token-claims]: Microsoft Learn, [ID token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference)（`iss` は token issuer / authorization server を示す URI）
 [^easyauth-live-capture]: Icefire555, [Easy Auth Header Decoding – Quick Reference Guide](https://icefire555.com/easy-auth-header-decoding-quick-reference-guide/)（2025 年の App Service 応答例。`/.auth/me.user_claims` 内の `iss` を確認するための観測資料であり、公式契約ではない）
+[^ms-container-token-store]: Microsoft Learn, [Use token store with Azure Container Apps authentication](https://learn.microsoft.com/en-us/azure/container-apps/token-store)（ACA token store は Azure Blob Storage と SAS URL を使用）
+[^aca-auth-arm]: Microsoft Learn, [Microsoft.App/containerApps/authConfigs](https://learn.microsoft.com/en-us/azure/templates/microsoft.app/containerapps/authconfigs)（ACA 認証 ARM スキーマ。`encryptionSettings`, IdP, token store）
+[^appservice-auth-arm]: Microsoft Learn, [Microsoft.Web/sites/config-authsettingsV2](https://learn.microsoft.com/en-us/azure/templates/microsoft.web/sites/config-authsettingsv2)（App Service 認証 ARM スキーマ。`requireAuthentication`, `legacyMicrosoftAccount`, file system token store）
+[^aca-auth-cli]: Microsoft Learn, [`az containerapp auth`](https://learn.microsoft.com/en-us/cli/azure/containerapp/auth)（ACA 認証 CLI と unauthenticated action、provider command）
+[^webapp-auth-cli]: Microsoft Learn, [`az webapp auth`](https://learn.microsoft.com/en-us/cli/azure/webapp/auth)（App Service 認証 CLI と `Return404`, token refresh extension, legacy config command）
+[^appservice-return404-spec-gap]: Azure REST API Specs issue [Web Apps: Add "Return404" value to unauthenticatedClientAction](https://github.com/Azure/azure-rest-api-specs/issues/20576)（App Service 実動作／CLI と ARM specification の差）

@@ -24,6 +24,42 @@ public sealed class StartOptionsFactoryTests
         Assert.True(options.OpenBrowser);
         Assert.True(options.NoUi);
         Assert.Equal("Alice Example", options.SelectedProfile?.DisplayName);
+        Assert.Equal(EmulatedPlatform.AppService, options.Platform);
+    }
+
+    [Fact]
+    public void CreatesContainerAppsOptions()
+    {
+        EmulatorOptions options = _factory.Create(new StartCommandInput(
+            "http://localhost:5173",
+            4180,
+            OpenBrowser: false,
+            ConfigFile: null,
+            ProfileName: null,
+            NoUi: false,
+            Platform: "container-apps"));
+
+        Assert.Equal(EmulatedPlatform.ContainerApps, options.Platform);
+        Assert.Equal("/.auth/logout/done", options.DefaultLogoutCompletePath);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("App-Service")]
+    [InlineData("containerapps")]
+    public void RejectsInvalidPlatform(string platform)
+    {
+        InputValidationException exception = Assert.Throws<InputValidationException>(() =>
+            _factory.Create(new StartCommandInput(
+                "http://localhost:5173",
+                4180,
+                OpenBrowser: false,
+                ConfigFile: null,
+                ProfileName: null,
+                NoUi: false,
+                Platform: platform)));
+
+        Assert.Contains("--platform", exception.Message, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -122,6 +158,24 @@ public sealed class StartOptionsFactoryTests
                 NoUi: false)));
 
         Assert.Contains("unexpected", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RejectsPlatformInJsonConfiguration()
+    {
+        using TemporaryConfig config = TemporaryConfig.Create(
+            """{"platform":"container-apps","profiles":{}}""");
+
+        InputValidationException exception = Assert.Throws<InputValidationException>(() =>
+            _factory.Create(new StartCommandInput(
+                "http://localhost:5173",
+                4180,
+                OpenBrowser: false,
+                config.File,
+                ProfileName: null,
+                NoUi: false)));
+
+        Assert.Contains("platform", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -25,6 +25,11 @@ public static class EmulatorCli
             Description = "The loopback port exposed by the emulator.",
             DefaultValueFactory = _ => 4180
         };
+        Option<string> platformOption = new("--platform")
+        {
+            Description = "The Azure authentication platform to emulate: app-service or container-apps.",
+            DefaultValueFactory = _ => PlatformContracts.AppService.CliValue
+        };
         Option<bool> openOption = new("--open")
         {
             Description = "Open the proxy URL in the default browser after startup."
@@ -46,6 +51,7 @@ public static class EmulatorCli
         {
             upstreamArgument,
             portOption,
+            platformOption,
             openOption,
             configOption,
             profileOption,
@@ -60,12 +66,14 @@ public static class EmulatorCli
                 parseResult.GetValue(openOption),
                 parseResult.GetValue(configOption),
                 parseResult.GetValue(profileOption),
-                parseResult.GetValue(noUiOption));
+                parseResult.GetValue(noUiOption),
+                parseResult.GetValue(platformOption)!);
 
             return runner.RunAsync(input, token);
         });
 
-        RootCommand rootCommand = new("Emulate Azure App Service Easy Auth for a local application.");
+        RootCommand rootCommand = new(
+            "Emulate Azure App Service or Azure Container Apps authentication for a local application.");
         rootCommand.Subcommands.Add(startCommand);
         return rootCommand;
     }

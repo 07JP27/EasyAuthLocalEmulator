@@ -21,7 +21,8 @@ public static class AuthAssets
         a { color: var(--primary); }
         .shell { width: min(780px, 100%); margin: 0 auto; padding: 32px 24px 0; }
         .auth-header { margin: 8px 0 28px; }
-        .product-name { margin: 0 0 18px; color: var(--muted); font-size: .875rem; font-weight: 650; }
+        .product-name { margin: 0; color: #343A40; font-size: .875rem; font-weight: 650; }
+        .platform-name { margin: 3px 0 18px; color: var(--muted); font-size: .78rem; }
         h1 { margin: 0 0 8px; font-size: 2rem; font-weight: 550; letter-spacing: -.025em; }
         .auth-header > p:last-child { max-width: 66ch; margin: 0; color: var(--muted); }
         .auth-form { width: 100%; }

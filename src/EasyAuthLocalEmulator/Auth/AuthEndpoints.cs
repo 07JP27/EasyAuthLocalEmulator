@@ -1,3 +1,5 @@
+using EasyAuthLocalEmulator.Configuration;
+
 namespace EasyAuthLocalEmulator.Auth;
 
 public static class AuthEndpoints
@@ -32,11 +34,12 @@ public static class AuthEndpoints
                 HttpContext context,
                 string? post_logout_redirect_uri,
                 LocalAuthenticationService authentication,
-                RedirectUriValidator redirectValidator) =>
+                RedirectUriValidator redirectValidator,
+                EmulatorOptions options) =>
             {
                 if (!redirectValidator.TryValidate(
                         post_logout_redirect_uri,
-                        "/.auth/logout/complete",
+                        options.DefaultLogoutCompletePath,
                         out string redirectUri))
                 {
                     return Results.BadRequest("Invalid post_logout_redirect_uri.");

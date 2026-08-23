@@ -11,13 +11,18 @@ namespace EasyAuthLocalEmulator.BrowserTests;
 [Collection(BrowserTestGroup.Name)]
 public sealed class NoUiAndFailureTests(BrowserFixture fixture) : PageTest
 {
-    [Fact]
-    public async Task NoUiLogoutAndLoginToggleProcessWideIdentity()
+    [Theory]
+    [InlineData(null, "/.auth/logout/complete")]
+    [InlineData("container-apps", "/.auth/logout/done")]
+    public async Task NoUiLogoutAndLoginToggleProcessWideIdentity(
+        string? platform,
+        string expectedLogoutPath)
     {
         await using EmulatorProcess emulator = await EmulatorProcess.StartAsync(
             fixture.SampleApp.BaseUri,
             noUi: true,
-            profileName: "x-user");
+            profileName: "x-user",
+            platform: platform);
 
         Assert.Equal(
             "x_user",
@@ -30,10 +35,11 @@ public sealed class NoUiAndFailureTests(BrowserFixture fixture) : PageTest
             new Uri(emulator.BaseUri, "/.auth/logout").AbsoluteUri,
             new APIRequestContextOptions { MaxRedirects = 0 });
         Assert.Equal(302, logout.Status);
+        Assert.Equal(expectedLogoutPath, logout.Headers["location"]);
         Assert.Null(await ReadPrincipalNameAsync(emulator.BaseUri));
 
         await Page.GotoAsync(
-            new Uri(emulator.BaseUri, "/.auth/logout/complete").AbsoluteUri);
+            new Uri(emulator.BaseUri, expectedLogoutPath).AbsoluteUri);
         await Expect(Page.Locator(".actions a[href^='/.auth/login/']"))
             .ToHaveCountAsync(1);
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Sign in with X" }))
@@ -51,6 +57,74 @@ public sealed class NoUiAndFailureTests(BrowserFixture fixture) : PageTest
         Assert.Equal(
             "x_user",
             await ReadPrincipalNameAsync(emulator.BaseUri));
+    }
+
+    [Theory]
+    [InlineData(
+        null,
+        "Azure App Service Easy Auth",
+        "/.auth/logout/complete")]
+    [InlineData(
+        "app-service",
+        "Azure App Service Easy Auth",
+        "/.auth/logout/complete")]
+    [InlineData(
+        "container-apps",
+        "Azure Container Apps authentication",
+        "/.auth/logout/done")]
+    public async Task PlatformControlsLabelsAndDefaultLogout(
+        string? platform,
+        string displayName,
+        string expectedLogoutPath)
+    {
+        await using EmulatorProcess emulator = await EmulatorProcess.StartAsync(
+            fixture.SampleApp.BaseUri,
+            noUi: false,
+            platform: platform);
+
+        Assert.Contains(
+            $"Platform:  {displayName}",
+            emulator.GetOutput(),
+            StringComparison.Ordinal);
+
+        IAPIResponse loginPage = await Page.APIRequest.GetAsync(
+            new Uri(emulator.BaseUri, "/.auth/login/aad").AbsoluteUri);
+        Assert.Contains(
+            $"Emulating: {displayName}",
+            await loginPage.TextAsync(),
+            StringComparison.Ordinal);
+
+        IAPIResponse logout = await Page.APIRequest.GetAsync(
+            new Uri(emulator.BaseUri, "/.auth/logout").AbsoluteUri,
+            new APIRequestContextOptions { MaxRedirects = 0 });
+        Assert.Equal(302, logout.Status);
+        Assert.Equal(expectedLogoutPath, logout.Headers["location"]);
+
+        IAPIResponse customLogout = await Page.APIRequest.GetAsync(
+            new Uri(
+                emulator.BaseUri,
+                "/.auth/logout?post_logout_redirect_uri=%2F").AbsoluteUri,
+            new APIRequestContextOptions { MaxRedirects = 0 });
+        Assert.Equal("/", customLogout.Headers["location"]);
+
+        foreach (string path in new[]
+                 {
+                     "/.auth/logout/complete",
+                     "/.auth/logout/done"
+                 })
+        {
+            IAPIResponse completion = await Page.APIRequest.GetAsync(
+                new Uri(emulator.BaseUri, path).AbsoluteUri);
+            Assert.Equal(200, completion.Status);
+            Assert.Contains(
+                $"Emulating: {displayName}",
+                await completion.TextAsync(),
+                StringComparison.Ordinal);
+        }
+
+        IAPIResponse me = await Page.APIRequest.GetAsync(
+            new Uri(emulator.BaseUri, "/.auth/me").AbsoluteUri);
+        Assert.Equal("[]", await me.TextAsync());
     }
 
     [Fact]

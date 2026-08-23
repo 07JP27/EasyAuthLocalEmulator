@@ -339,7 +339,7 @@ internal static class SamplePage
                     <span class="account-name">{{name}}</span>
                     <span class="account-provider">{{provider}}</span>
                   </div>
-                  <a class="bar-action" href="/.auth/logout?post_logout_redirect_uri=/">Sign out</a>
+                  <a class="bar-action" href="/.auth/logout">Sign out</a>
                 </div>
                 """;
         }

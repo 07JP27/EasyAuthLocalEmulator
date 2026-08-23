@@ -18,6 +18,7 @@ public sealed class EmulatorHost
 
         await standardOutput.WriteLineAsync($"Upstream:  {options.Upstream}");
         await standardOutput.WriteLineAsync($"Proxy:     {options.ProxyOrigin}");
+        await standardOutput.WriteLineAsync($"Platform:  {options.PlatformDisplayName}");
         await standardOutput.WriteLineAsync($"Login:     {options.LoginUrl}");
         await standardOutput.WriteLineAsync(
             $"Profile:   {options.SelectedProfileName ?? "interactive"}");
@@ -75,7 +76,12 @@ public sealed class EmulatorHost
         builder.Services.AddSingleton<RedirectUriValidator>();
         builder.Services.AddSingleton(IdentityProviderRegistry.Default);
         builder.Services.AddHostedService<SessionCleanupService>();
-        builder.Services.AddRazorPages();
+        builder.Services.AddRazorPages(options =>
+        {
+            options.Conventions.AddPageRoute(
+                "/Auth/LogoutComplete",
+                PlatformContracts.ContainerApps.DefaultLogoutCompletePath);
+        });
         builder.Services.AddEasyAuthProxy();
 
         WebApplication application = builder.Build();

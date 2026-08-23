@@ -75,23 +75,16 @@ public sealed class AuthenticationFlowTests(BrowserFixture fixture) : PageTest
         ILocator signOut = Page.GetByRole(AriaRole.Link, new() { Name = "Sign out" });
         await Expect(signOut).ToHaveAttributeAsync(
             "href",
-            "/.auth/logout?post_logout_redirect_uri=/");
+            "/.auth/logout");
         await signOut.ClickAsync();
         await Expect(Page).ToHaveURLAsync(
-            new Uri(fixture.Emulator.BaseUri, "/").AbsoluteUri);
-        await Expect(Page.Locator("#authentication-status")).ToHaveTextAsync("Anonymous");
-        await Expect(Page.Locator("#principal-name")).ToHaveTextAsync("Not present");
-        await Expect(Page.Locator("#encoded-principal")).ToHaveTextAsync("Not present");
-        await Page.Locator(".sign-in-menu summary").ClickAsync();
-        await Expect(Page.Locator(".sign-in-menu nav a")).ToHaveCountAsync(6);
+            new Uri(
+                fixture.Emulator.BaseUri,
+                "/.auth/logout/complete").AbsoluteUri);
         await Expect(Page.GetByRole(
-                AriaRole.Link,
-                new() { Name = "Microsoft Entra ID", Exact = true }))
+                AriaRole.Heading,
+                new() { Name = "Signed out" }))
             .ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Sign out" }))
-            .ToHaveCountAsync(0);
-        await Expect(Page.Locator("#decoded-principal"))
-            .ToHaveTextAsync("No client principal was provided.");
     }
 
     [Fact]

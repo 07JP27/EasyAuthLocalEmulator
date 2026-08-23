@@ -28,7 +28,8 @@ public sealed class EmulatorProcess : IAsyncDisposable
         Uri upstream,
         bool noUi,
         int? port = null,
-        string profileName = DefaultProfileName)
+        string profileName = DefaultProfileName,
+        string? platform = null)
     {
         int selectedPort = port ?? TestEnvironmentInfo.AllocatePort();
         string temporaryDirectory = CreateTemporaryDirectory();
@@ -38,7 +39,8 @@ public sealed class EmulatorProcess : IAsyncDisposable
             selectedPort,
             configurationPath,
             noUi,
-            profileName);
+            profileName,
+            platform);
         ChildProcess? process = null;
 
         try
@@ -62,14 +64,18 @@ public sealed class EmulatorProcess : IAsyncDisposable
         }
     }
 
-    public static async Task<EmulatorProcessResult> RunToExitAsync(Uri upstream, int port)
+    public static async Task<EmulatorProcessResult> RunToExitAsync(
+        Uri upstream,
+        int port,
+        string? platform = null)
     {
         System.Diagnostics.ProcessStartInfo startInfo = CreateStartInfo(
             upstream,
             port,
             configurationPath: null,
             noUi: false,
-            profileName: null);
+            profileName: null,
+            platform);
         await using ChildProcess process = ChildProcess.Start(startInfo);
         ChildProcessResult result = await process.WaitForExitAsync(TimeSpan.FromSeconds(20));
         return new EmulatorProcessResult(
@@ -99,7 +105,8 @@ public sealed class EmulatorProcess : IAsyncDisposable
         int port,
         string? configurationPath,
         bool noUi,
-        string? profileName)
+        string? profileName,
+        string? platform)
     {
         System.Diagnostics.ProcessStartInfo startInfo =
             TestEnvironmentInfo.CreateDotNetRunStartInfo(
@@ -110,6 +117,12 @@ public sealed class EmulatorProcess : IAsyncDisposable
         startInfo.ArgumentList.Add("--port");
         startInfo.ArgumentList.Add(
             port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        if (platform is not null)
+        {
+            startInfo.ArgumentList.Add("--platform");
+            startInfo.ArgumentList.Add(platform);
+        }
 
         if (configurationPath is not null)
         {

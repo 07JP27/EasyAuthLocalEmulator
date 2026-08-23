@@ -23,6 +23,8 @@ public sealed class LoginModel(
 
     public string ProviderDisplayName { get; private set; } = "Microsoft Entra ID";
 
+    public string PlatformDisplayName => options.PlatformDisplayName;
+
     public string? SelectedPresetName { get; private set; }
 
     public IReadOnlyList<string> ProfileNames { get; private set; } = [];

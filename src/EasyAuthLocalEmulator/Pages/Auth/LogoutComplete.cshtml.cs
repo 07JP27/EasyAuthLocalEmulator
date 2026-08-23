@@ -1,4 +1,5 @@
 using EasyAuthLocalEmulator.Auth;
+using EasyAuthLocalEmulator.Configuration;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace EasyAuthLocalEmulator.Pages.Auth;
@@ -8,8 +9,10 @@ public sealed class LogoutCompleteModel
 {
     public LogoutCompleteModel(
         IdentityProviderRegistry providers,
-        LocalAuthenticationService authentication)
+        LocalAuthenticationService authentication,
+        EmulatorOptions options)
     {
+        PlatformDisplayName = options.PlatformDisplayName;
         Providers = authentication.NoUi && authentication.SelectedProfile is not null
             ? providers.Providers
                 .Where(provider =>
@@ -21,6 +24,8 @@ public sealed class LogoutCompleteModel
     }
 
     public IReadOnlyList<IdentityProviderDefinition> Providers { get; }
+
+    public string PlatformDisplayName { get; }
 
     public void OnGet()
     {

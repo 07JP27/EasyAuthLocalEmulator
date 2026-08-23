@@ -15,6 +15,7 @@ public sealed class EmulatorCliTests
 
         Assert.Empty(result.Errors);
         Assert.Equal(4180, result.GetValue<int>("--port"));
+        Assert.Equal("app-service", result.GetValue<string>("--platform"));
         Assert.False(result.GetValue<bool>("--open"));
         Assert.False(result.GetValue<bool>("--no-ui"));
     }

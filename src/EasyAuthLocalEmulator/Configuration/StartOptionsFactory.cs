@@ -19,6 +19,7 @@ public sealed class StartOptionsFactory
     {
         Uri upstream = ParseUpstream(input.UpstreamUrl);
         ValidatePort(input.Port);
+        EmulatedPlatform platform = ParsePlatform(input.Platform);
 
         EmulatorConfigurationFile configuration = LoadConfiguration(input.ConfigFile);
         ValidateSessionLifetime(configuration.SessionLifetime);
@@ -60,7 +61,8 @@ public sealed class StartOptionsFactory
             selectedProfileName,
             selectedProfile,
             input.NoUi,
-            configuration.SessionLifetime);
+            configuration.SessionLifetime,
+            platform);
     }
 
     private static Uri ParseUpstream(string value)
@@ -101,6 +103,17 @@ public sealed class StartOptionsFactory
         {
             throw new InputValidationException("--port must be between 1 and 65535.");
         }
+    }
+
+    private static EmulatedPlatform ParsePlatform(string value)
+    {
+        if (!PlatformContracts.TryParse(value, out PlatformContract? contract))
+        {
+            throw new InputValidationException(
+                "--platform must be either 'app-service' or 'container-apps'.");
+        }
+
+        return contract.Platform;
     }
 
     private static void ValidateSessionLifetime(TimeSpan lifetime)

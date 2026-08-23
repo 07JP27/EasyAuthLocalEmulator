@@ -6,4 +6,5 @@ public sealed record StartCommandInput(
     bool OpenBrowser,
     FileInfo? ConfigFile,
     string? ProfileName,
-    bool NoUi);
+    bool NoUi,
+    string Platform = PlatformContracts.AppServiceCliValue);

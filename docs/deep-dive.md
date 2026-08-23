@@ -8,7 +8,7 @@
 
 ## 設計目標
 
-このプロジェクトが再現するのは、Azure App Service Easy Auth の公開された開発者向け HTTP 契約です。
+このプロジェクトが再現するのは、Azure App Service Easy Auth と Azure Container Apps 組み込み認証の公開された開発者向け HTTP 契約です。
 
 - `/.auth/*` の認証ルート
 - `X-MS-CLIENT-PRINCIPAL*` ヘッダー
@@ -17,6 +17,18 @@
 - 認証プロキシとしての通常リクエスト転送
 
 Azure 内部の実装や、実 IdP が発行するトークンまでは再現しません。
+
+platform は起動引数だけで選びます。
+
+```console
+easyauth start http://localhost:5173 \
+  --platform app-service
+
+easyauth start http://localhost:5173 \
+  --platform container-apps
+```
+
+省略時は `app-service` です。模擬プロファイルは両 platform で共有できるため、JSON 設定には platform を保存しません。
 
 ## アーキテクチャ
 
@@ -44,6 +56,46 @@ Azure 内部の実装や、実 IdP が発行するトークンまでは再現し
 5. セッションが有効ならプリンシパルを組み立て、4つの `X-MS-CLIENT-PRINCIPAL*` を付けます。
 6. パス、クエリ、HTTP メソッド、本文を保ったまま転送先へ送ります。
 
+## App Service と Azure Container Apps の差分
+
+両 platform は同じ認証システムを使います。現在のエミュレーターで利用者が観測できる差分は、platform 表示と既定のログアウト完了 URL です。
+
+| 項目 | App Service | Azure Container Apps | エミュレーター |
+|---|---|---|---|
+| 既定のログアウト完了 URL | `/.auth/logout/complete` | `/.auth/logout/done` | platform で切り替え |
+| `Return404` | あり | なし | 認可設定が未実装のため文書化のみ |
+| `globalValidation.requireAuthentication` | ARM にあり | ARM になし | 未実装 |
+| ファイルシステム token store | あり | なし | 実トークン非対応 |
+| Blob token store | あり | あり | 実トークン非対応 |
+| 明示的な `encryptionSettings` | なし | あり | 単一プロセスのため非対応 |
+| file-based auth config | 公式文書と ARM 項目あり | ARM 項目なし、CLI 引数あり | 独自プロファイル JSON とは無関係 |
+| Apple | 概念文書、ARM、CLI にあり | ARM と CLI にあるが概念文書にない | 両モードで利用可能 |
+| GitHub のカスタムサインイン／サインアウト | 非対応と明記 | 同等の制限記載なし | 現エミュレーターでは対象外、不確定事項として記録 |
+| Protected Resource Metadata | preview で提供 | ACA では確認できない | 両モードとも対象外 |
+| 既定セッション8時間 / 72時間猶予 | 公式記載あり | ACA 固有の記載なし | 両モードで8時間 |
+| `/.auth/me` 完全スキーマ | 未公開 | ACA 固有説明なし | 両モードで共通 |
+
+### 実行時に分けないもの
+
+次は両モードで同じです。
+
+- IdP とログイン URL
+- `X-MS-CLIENT-PRINCIPAL*`
+- principal JSON
+- `/.auth/me`
+- 模擬プロファイルとセッション
+- YARP プロキシ
+
+Cookie 名、ACA のセッション既定時間、`/.auth/me` の完全な応答差は公式文書だけでは確定できません。証拠のない platform 分岐は作らず、現在の互換方針を共有します。
+
+### ACA 固有の注意
+
+- SPA のクライアント側ルーターが `/.auth/login/*` を横取りすると、認証 sidecar へ届きません。
+- 複数 replica の署名・暗号化キーは ACA の `encryptionSettings` で明示できますが、単一プロセスの本エミュレーターでは再現しません。
+- ACA の Apple 対応は ARM スキーマと Azure CLI で確認できますが、概念文書の IdP 一覧には掲載されていません。
+- App Service 文書は GitHub のカスタムサインイン／サインアウトを非対応としていますが、ACA 文書に同じ制限はありません。実動作差か文書差かは未確認です。
+- App Service の preview 機能である Protected Resource Metadata (`/.well-known/oauth-protected-resource`) は ACA で確認できず、本エミュレーターでは両モードとも対象外です。
+
 ## 認証ルート
 
 | ルート | 現在の動作 |
@@ -57,7 +109,9 @@ Azure 内部の実装や、実 IdP が発行するトークンまでは再現し
 
 ログインとログアウトのリダイレクト先は、プロキシ内の絶対パスだけを許可します。`//example.com` 形式の URL、外部オリジン、バックスラッシュ、制御文字、二重デコードで意味が変わる値を拒否します。
 
-App Service の既定に合わせ、`post_logout_redirect_uri` がない場合は `/.auth/logout/complete` へ移動します。サンプルアプリは明示的に `post_logout_redirect_uri=/` を指定します。
+`post_logout_redirect_uri` がない場合は、App Service モードで `/.auth/logout/complete`、Azure Container Apps モードで `/.auth/logout/done` へ移動します。サンプルアプリは明示的に `post_logout_redirect_uri=/` を指定します。
+
+完了画面は両 URL で表示できます。既定の移動先だけを platform で切り替えます。
 
 ## プリンシパルとヘッダー
 
@@ -204,6 +258,8 @@ Cookie 属性:
 - HTTP のローカル待ち受けなので `Secure` は付けない
 
 既定の有効期間は8時間です。`/.auth/refresh` で期限を延長します。期限切れはリクエスト時と定期処理の両方で削除します。プロセスを終了するとすべてのセッションが失われます。
+
+8時間とその後の72時間の猶予は App Service 文書に記載されていますが、ACA 文書では同じ数値を独立確認できません。エミュレーターは両モードで8時間を使い、72時間の猶予は再現しません。
 
 ## セキュリティ境界
 

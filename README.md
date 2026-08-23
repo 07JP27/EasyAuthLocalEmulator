@@ -1,6 +1,6 @@
 # EasyAuth Local Emulator
 
-Azure App Service Easy Auth の `/.auth/*` と `X-MS-CLIENT-PRINCIPAL*` を、実際の ID プロバイダーなしでローカル再現する開発用プロキシです。
+Azure App Service Easy Auth と Azure Container Apps の組み込み認証を、実際の ID プロバイダーなしでローカル再現する開発用プロキシです。
 
 - 任意のローカル Web アプリを認証プロキシの後ろで動かせます。
 - ブラウザーまたは設定ファイルから模擬ユーザーを作れます。
@@ -28,6 +28,13 @@ Azure App Service Easy Auth の `/.auth/*` と `X-MS-CLIENT-PRINCIPAL*` を、�
 
    ```console
    easyauth start http://localhost:5173
+   ```
+
+   Azure Container Apps を再現する場合:
+
+   ```console
+   easyauth start http://localhost:5173 \
+     --platform container-apps
    ```
 
 3. `http://127.0.0.1:4180` を開きます。
@@ -61,6 +68,7 @@ easyauth start <upstream-url> [options]
 
 | オプション | 説明 |
 |---|---|
+| `--platform <platform>` | `app-service` または `container-apps`。既定値は `app-service` |
 | `--port <port>` | プロキシのポート。既定値は `4180` |
 | `--open` | 起動後にプロキシ URL を既定のブラウザーで開く |
 | `--config <path>` | JSON 設定ファイル |
@@ -68,6 +76,19 @@ easyauth start <upstream-url> [options]
 | `--no-ui` | 選択プロファイルを画面なしで使用する |
 
 エミュレーターは `127.0.0.1` だけで待ち受け、転送先もこのコンピューター自身を指すアドレスだけを許可します。
+platform は起動するたびに CLI で選び、JSON 設定には保存しません。
+
+## 対応プラットフォーム
+
+| `--platform` | 再現対象 | 既定のログアウト完了 URL |
+|---|---|---|
+| `app-service` | Azure App Service Easy Auth | `/.auth/logout/complete` |
+| `container-apps` | Azure Container Apps authentication | `/.auth/logout/done` |
+
+ログイン画面とログアウト完了画面には、現在選択している platform が表示されます。
+
+> [!NOTE]
+> Azure Container Apps モードでは、SPA のクライアント側ルーターが `/.auth/login/*` を横取りしないようにしてください。このルートはサーバー側の認証機能へ到達する必要があります。
 
 ## プロファイル
 
@@ -146,7 +167,7 @@ easyauth start http://localhost:5173 \
 
 - ローカル開発専用です。本番環境へ公開しないでください。
 - 実トークンを生成しないため、外部 API、条件付きアクセス、実際の ID プロバイダー認証は再現しません。
-- 任意の OpenID Connect プロバイダー、App Service の認可設定全体、IIS 統合、HTTP/2・gRPC の互換性は保証しません。
+- 任意の OpenID Connect プロバイダー、platform の認可設定全体、IIS 統合、HTTP/2・gRPC の互換性は保証しません。
 - 最終確認は Azure 上で実施してください。
 
 ## さらに詳しく
