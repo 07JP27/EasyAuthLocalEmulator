@@ -411,14 +411,18 @@ CI は Windows と macOS で次を実行します。
 - Chromium BrowserTests
 - WebKit BrowserTests
 
-`v*` タグで、次の自己完結単一ファイルを作ります。
+リリースは `main` の **Actions → Release → Run workflow** から手動で開始します。
+`1.0.0` のように `v` を付けない version を入力すると、対応する `v1.0.0` タグと GitHub Release をワークフローが作成します。
+`1.0.0-beta.1` のような SemVer prerelease は GitHub のプレリリースとして公開します。
+
+次の自己完結単一ファイルを作ります。
 
 - `win-x64`
 - `win-arm64`
 - `osx-x64`
 - `osx-arm64`
 
-リリースワークフローは RID ごとのアーカイブと SHA-256 チェックサムを作り、GitHub Release へ添付します。サンプルアプリは配布アーカイブに含めません。
+リリースワークフローは RID ごとのアーカイブと SHA-256 チェックサムを作成し、リリースノートを生成して、すべての成果物を GitHub Release へ添付します。サンプルアプリは配布アーカイブに含めません。
 
 ## ソース構成
 

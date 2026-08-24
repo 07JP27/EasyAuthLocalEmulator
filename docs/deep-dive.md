@@ -411,14 +411,18 @@ CI runs the following on Windows and macOS.
 - Chromium BrowserTests
 - WebKit BrowserTests
 
-For `v*` tags, the following self-contained single-file binaries are built.
+Releases are started manually from **Actions → Release → Run workflow** on `main`.
+Enter a version without the `v` prefix, such as `1.0.0`; the workflow creates the corresponding `v1.0.0` tag and GitHub Release.
+SemVer prerelease versions such as `1.0.0-beta.1` are published as GitHub prereleases.
+
+The following self-contained single-file binaries are built.
 
 - `win-x64`
 - `win-arm64`
 - `osx-x64`
 - `osx-arm64`
 
-The release workflow creates an archive and a SHA-256 checksum per RID, and attaches them to the GitHub Release. The sample app is not included in the distributed archives.
+The release workflow creates an archive and a SHA-256 checksum per RID, generates release notes, and attaches all artifacts to the GitHub Release. The sample app is not included in the distributed archives.
 
 ## Source layout
 
