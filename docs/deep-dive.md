@@ -1,24 +1,26 @@
 # EasyAuth Local Emulator Deep Dive
 
-この文書は、EasyAuth Local Emulator の設計や実装を変更するコントリビューター向けの技術ガイドです。
+<p align="center">English | <a href="deep-dive_jp.md">日本語</a></p>
 
-- 利用方法は [README](../README.md)
-- 全設定項目は [JSON Schema](../schemas/easyauth-local.schema.json)
-- 実現性調査、既存ツール比較、出典は [調査資料](../research/azure-app-service-easy-auth-azure-static.md)
+This document is a technical guide for contributors who change the design or implementation of EasyAuth Local Emulator.
 
-## 設計目標
+- For usage, see the [README](../README.md)
+- For all configuration options, see the [JSON Schema](../schemas/easyauth-local.schema.json)
+- For the feasibility research, comparison with existing tools, and sources, see the [research document](../research/azure-app-service-easy-auth-azure-static.md)
 
-このプロジェクトが再現するのは、Azure App Service Easy Auth と Azure Container Apps 組み込み認証の公開された開発者向け HTTP 契約です。
+## Design goals
 
-- `/.auth/*` の認証ルート
-- `X-MS-CLIENT-PRINCIPAL*` ヘッダー
-- `/.auth/me` の ID 情報
-- ブラウザーのセッション Cookie
-- 認証プロキシとしての通常リクエスト転送
+This project reproduces the published, developer-facing HTTP contract of Azure App Service Easy Auth and Azure Container Apps built-in authentication.
 
-Azure 内部の実装や、実 IdP が発行するトークンまでは再現しません。
+- The `/.auth/*` authentication routes
+- The `X-MS-CLIENT-PRINCIPAL*` headers
+- The identity information in `/.auth/me`
+- The browser session cookie
+- Regular request forwarding as an authentication proxy
 
-platform は起動引数だけで選びます。
+It does not reproduce Azure's internal implementation or tokens issued by a real identity provider.
+
+The platform is selected only via startup arguments.
 
 ```console
 easyauth start http://localhost:5173 \
@@ -28,94 +30,94 @@ easyauth start http://localhost:5173 \
   --platform container-apps
 ```
 
-省略時は `app-service` です。模擬プロファイルは両 platform で共有できるため、JSON 設定には platform を保存しません。
+It defaults to `app-service`. Because mock profiles can be shared across both platforms, the platform is not saved in the JSON configuration.
 
-## アーキテクチャ
+## Architecture
 
-[利用者向けのリクエスト経路図](easy-auth-local-emulator-overview.drawio.svg)
+[Request path diagram for users](easy-auth-local-emulator-overview.drawio.svg)
 
-実行ファイルは .NET 10 の ASP.NET Core アプリです。CLI、Razor Pages、認証ルート、セッション、YARP プロキシを一つのプロセスに収めています。
+The executable is a .NET 10 ASP.NET Core app. The CLI, Razor Pages, authentication routes, session, and YARP proxy are all contained in a single process.
 
-| 構成要素 | 主な場所 | 責務 |
+| Component | Primary location | Responsibility |
 |---|---|---|
-| CLI | `src/EasyAuthLocalEmulator/Cli` | 引数解析、設定読込、起動、終了 |
-| 設定 | `src/EasyAuthLocalEmulator/Configuration` | JSON 読込、厳格な検証、CLI オプションとの統合 |
-| IdP / プリンシパル | `src/EasyAuthLocalEmulator/Auth` | IdP 定義、プロファイル、クレーム、ヘッダー、`/.auth/me` |
-| 認証画面 | `src/EasyAuthLocalEmulator/Pages/Auth` | 模擬ログイン、ログアウト完了 |
-| プロキシ | `src/EasyAuthLocalEmulator/Proxy` | 通常リクエスト、ストリーム、WebSocket の転送 |
-| サンプル | `samples/EasyAuthLocalEmulator.SampleApp` | 手動確認と E2E で共用する転送先アプリ |
-| UnitTests | `tests/EasyAuthLocalEmulator.UnitTests` | データ契約、設定、セッション、変換処理 |
-| BrowserTests | `tests/EasyAuthLocalEmulator.BrowserTests` | 実プロセスを使う Chromium / WebKit E2E |
+| CLI | `src/EasyAuthLocalEmulator/Cli` | Argument parsing, configuration loading, startup, shutdown |
+| Configuration | `src/EasyAuthLocalEmulator/Configuration` | JSON loading, strict validation, integration with CLI options |
+| IdP / principal | `src/EasyAuthLocalEmulator/Auth` | IdP definitions, profiles, claims, headers, `/.auth/me` |
+| Authentication screens | `src/EasyAuthLocalEmulator/Pages/Auth` | Mock login, logout complete |
+| Proxy | `src/EasyAuthLocalEmulator/Proxy` | Forwarding of regular requests, streams, and WebSocket |
+| Sample | `samples/EasyAuthLocalEmulator.SampleApp` | Upstream app shared by manual verification and E2E |
+| UnitTests | `tests/EasyAuthLocalEmulator.UnitTests` | Data contracts, configuration, session, transformation logic |
+| BrowserTests | `tests/EasyAuthLocalEmulator.BrowserTests` | Chromium / WebKit E2E using real processes |
 
-### リクエスト処理順
+### Request processing order
 
-1. `/.auth/*` を認証ルートとして先に照合します。
-2. 未知の `/.auth/*` は `404` とし、転送先へ渡しません。
-3. その他のリクエストは YARP の直接転送機能へ渡します。
-4. クライアントが付けた Easy Auth ヘッダーと転送ヘッダーを削除します。
-5. セッションが有効ならプリンシパルを組み立て、4つの `X-MS-CLIENT-PRINCIPAL*` を付けます。
-6. パス、クエリ、HTTP メソッド、本文を保ったまま転送先へ送ります。
+1. Match `/.auth/*` as an authentication route first.
+2. Return `404` for unknown `/.auth/*` routes, without passing them to the upstream.
+3. Pass all other requests to YARP's direct forwarding feature.
+4. Strip any Easy Auth headers and forwarded headers attached by the client.
+5. If the session is valid, build the principal and attach the four `X-MS-CLIENT-PRINCIPAL*` headers.
+6. Forward the request to the upstream, preserving the path, query, HTTP method, and body.
 
-## App Service と Azure Container Apps の差分
+## Differences between App Service and Azure Container Apps
 
-両 platform は同じ認証システムを使います。現在のエミュレーターで利用者が観測できる差分は、platform 表示と既定のログアウト完了 URL です。
+Both platforms use the same authentication system. The differences currently observable by users of the emulator are the platform display and the default logout-complete URL.
 
-| 項目 | App Service | Azure Container Apps | エミュレーター |
+| Item | App Service | Azure Container Apps | Emulator |
 |---|---|---|---|
-| 既定のログアウト完了 URL | `/.auth/logout/complete` | `/.auth/logout/done` | platform で切り替え |
-| `Return404` | あり | なし | 認可設定が未実装のため文書化のみ |
-| `globalValidation.requireAuthentication` | ARM にあり | ARM になし | 未実装 |
-| ファイルシステム token store | あり | なし | 実トークン非対応 |
-| Blob token store | あり | あり | 実トークン非対応 |
-| 明示的な `encryptionSettings` | なし | あり | 単一プロセスのため非対応 |
-| file-based auth config | 公式文書と ARM 項目あり | ARM 項目なし、CLI 引数あり | 独自プロファイル JSON とは無関係 |
-| Apple | 概念文書、ARM、CLI にあり | ARM と CLI にあるが概念文書にない | 両モードで利用可能 |
-| GitHub のカスタムサインイン／サインアウト | 非対応と明記 | 同等の制限記載なし | 現エミュレーターでは対象外、不確定事項として記録 |
-| Protected Resource Metadata | preview で提供 | ACA では確認できない | 両モードとも対象外 |
-| 既定セッション8時間 / 72時間猶予 | 公式記載あり | ACA 固有の記載なし | 両モードで8時間 |
-| `/.auth/me` 完全スキーマ | 未公開 | ACA 固有説明なし | 両モードで共通 |
+| Default logout-complete URL | `/.auth/logout/complete` | `/.auth/logout/done` | Switched by platform |
+| `Return404` | Present | Absent | Documented only, since authorization configuration is not implemented |
+| `globalValidation.requireAuthentication` | In ARM | Not in ARM | Not implemented |
+| Filesystem token store | Present | Absent | Real tokens not supported |
+| Blob token store | Present | Present | Real tokens not supported |
+| Explicit `encryptionSettings` | Absent | Present | Not supported, since it's a single process |
+| File-based auth config | In official docs and ARM | In CLI args, not in ARM | Unrelated to the emulator's own profile JSON |
+| Apple | In conceptual docs, ARM, and CLI | In ARM and CLI, not in conceptual docs | Available in both modes |
+| GitHub custom sign-in/sign-out | Explicitly unsupported | No equivalent restriction documented | Out of scope for the current emulator; recorded as an open question |
+| Protected Resource Metadata | Available in preview | Not confirmed for ACA | Out of scope in both modes |
+| Default 8-hour session / 72-hour grace period | Documented officially | Not documented specifically for ACA | 8 hours in both modes |
+| Full `/.auth/me` schema | Undocumented | No ACA-specific description | Common to both modes |
 
-### 実行時に分けないもの
+### What is not differentiated at runtime
 
-次は両モードで同じです。
+The following are the same in both modes.
 
-- IdP とログイン URL
+- IdPs and login URLs
 - `X-MS-CLIENT-PRINCIPAL*`
-- principal JSON
+- Principal JSON
 - `/.auth/me`
-- 模擬プロファイルとセッション
-- YARP プロキシ
+- Mock profiles and sessions
+- The YARP proxy
 
-Cookie 名、ACA のセッション既定時間、`/.auth/me` の完全な応答差は公式文書だけでは確定できません。証拠のない platform 分岐は作らず、現在の互換方針を共有します。
+The cookie name, ACA's default session duration, and the exact differences in the `/.auth/me` response cannot be confirmed from official documentation alone. We avoid platform branching that lacks evidence, and share the current compatibility policy here.
 
-### ACA 固有の注意
+### ACA-specific notes
 
-- SPA のクライアント側ルーターが `/.auth/login/*` を横取りすると、認証 sidecar へ届きません。
-- 複数 replica の署名・暗号化キーは ACA の `encryptionSettings` で明示できますが、単一プロセスの本エミュレーターでは再現しません。
-- ACA の Apple 対応は ARM スキーマと Azure CLI で確認できますが、概念文書の IdP 一覧には掲載されていません。
-- App Service 文書は GitHub のカスタムサインイン／サインアウトを非対応としていますが、ACA 文書に同じ制限はありません。実動作差か文書差かは未確認です。
-- App Service の preview 機能である Protected Resource Metadata (`/.well-known/oauth-protected-resource`) は ACA で確認できず、本エミュレーターでは両モードとも対象外です。
+- If a SPA's client-side router intercepts `/.auth/login/*`, requests never reach the authentication sidecar.
+- Signing and encryption keys across multiple replicas can be made explicit via ACA's `encryptionSettings`, but this emulator does not reproduce that since it is a single process.
+- ACA's Apple support can be confirmed via the ARM schema and Azure CLI, but it is not listed in the conceptual documentation's IdP list.
+- App Service docs state that GitHub custom sign-in/sign-out is unsupported, but the ACA docs do not state the same restriction. It is unconfirmed whether this is an actual behavioral difference or a documentation gap.
+- App Service's preview feature, Protected Resource Metadata (`/.well-known/oauth-protected-resource`), cannot be confirmed for ACA, and this emulator excludes it in both modes.
 
-## 認証ルート
+## Authentication routes
 
-| ルート | 現在の動作 |
+| Route | Current behavior |
 |---|---|
-| `GET /.auth/login/<provider>` | IdP ごとの模擬ログイン画面 |
-| `POST /.auth/login/<provider>` | 偽造防止トークンと入力を検証し、セッションを作成 |
-| `GET /.auth/me` | 認証済みは ID 情報の配列、未認証は `[]` |
-| `GET /.auth/logout` | セッションを破棄してリダイレクト |
-| `GET /.auth/refresh` | 有効なら期限を延長して `200`、無効なら `401` |
-| その他の `/.auth/*` | `404` |
+| `GET /.auth/login/<provider>` | Mock login screen per IdP |
+| `POST /.auth/login/<provider>` | Validates the anti-forgery token and input, and creates a session |
+| `GET /.auth/me` | An array of identity information when authenticated, `[]` when not |
+| `GET /.auth/logout` | Destroys the session and redirects |
+| `GET /.auth/refresh` | `200` with an extended expiration if valid, `401` if invalid |
+| Other `/.auth/*` | `404` |
 
-ログインとログアウトのリダイレクト先は、プロキシ内の絶対パスだけを許可します。`//example.com` 形式の URL、外部オリジン、バックスラッシュ、制御文字、二重デコードで意味が変わる値を拒否します。
+The redirect destinations for login and logout only allow absolute paths inside the proxy. URLs in the `//example.com` form, external origins, backslashes, control characters, and values whose meaning changes under double decoding are all rejected.
 
-`post_logout_redirect_uri` がない場合は、App Service モードで `/.auth/logout/complete`、Azure Container Apps モードで `/.auth/logout/done` へ移動します。サンプルアプリは明示的に `post_logout_redirect_uri=/` を指定します。
+If `post_logout_redirect_uri` is absent, the browser is redirected to `/.auth/logout/complete` in App Service mode and `/.auth/logout/done` in Azure Container Apps mode. The sample app explicitly specifies `post_logout_redirect_uri=/`.
 
-完了画面は両 URL で表示できます。既定の移動先だけを platform で切り替えます。
+The complete screen can be shown at either URL. Only the default destination is switched by platform.
 
-## プリンシパルとヘッダー
+## Principal and headers
 
-`X-MS-CLIENT-PRINCIPAL` は、次の JSON を UTF-8 で直列化し、標準 Base64 で符号化した値です。
+`X-MS-CLIENT-PRINCIPAL` is the following JSON, serialized as UTF-8 and encoded with standard Base64.
 
 ```json
 {
@@ -130,9 +132,9 @@ Cookie 名、ACA のセッション既定時間、`/.auth/me` の完全な応答
 }
 ```
 
-クレームは辞書に変換せず配列のまま保持します。同じ種類のロール、グループ、その他のクレームを複数含められるようにするためです。
+Claims are kept as an array rather than converted to a dictionary, so that multiple roles, groups, or other claims of the same type can be included.
 
-同じ `PrincipalBuilder` から次を生成します。
+The same `PrincipalBuilder` generates all of the following.
 
 - `X-MS-CLIENT-PRINCIPAL`
 - `X-MS-CLIENT-PRINCIPAL-ID`
@@ -140,13 +142,13 @@ Cookie 名、ACA のセッション既定時間、`/.auth/me` の完全な応答
 - `X-MS-CLIENT-PRINCIPAL-IDP`
 - `/.auth/me[0]`
 
-`auth_typ`、`X-MS-CLIENT-PRINCIPAL-IDP`、`/.auth/me[0].provider_name` は、プロファイルの `authenticationType` を共有します。
+`auth_typ`, `X-MS-CLIENT-PRINCIPAL-IDP`, and `/.auth/me[0].provider_name` all share the profile's `authenticationType`.
 
-生成したプリンシパル JSON は 64 KiB を上限とします。
+The generated principal JSON is capped at 64 KiB.
 
 ## `/.auth/me`
 
-認証済みでは、現在の実装は次の形の配列を返します。
+When authenticated, the current implementation returns an array of the following shape.
 
 ```json
 [
@@ -166,26 +168,26 @@ Cookie 名、ACA のセッション既定時間、`/.auth/me` の完全な応答
 ]
 ```
 
-実トークンを発行しないため、トークン関連項目は `null` です。
+Because it doesn't issue real tokens, the token-related fields are `null`.
 
-発行者 (`issuer`) はトップレベルの `issuer` 項目ではなく、`user_claims` とプリンシパルの `claims` にある `iss` クレームとして表現します。`issuer` を空文字にすると `iss` を生成しません。
+The issuer is expressed as an `iss` claim in `user_claims` and in the principal's `claims`, rather than as a top-level `issuer` field. Setting `issuer` to an empty string prevents `iss` from being generated.
 
-`/.auth/me` の完全な公式スキーマと未認証時の挙動は公開されていません。未認証時の `200 []` は、このエミュレーターが採用している互換方針です。根拠と不確定事項は [調査資料](../research/azure-app-service-easy-auth-azure-static.md) を参照してください。
+The complete official schema for `/.auth/me`, and the behavior when unauthenticated, are not publicly documented. The `200 []` response when unauthenticated is the compatibility policy adopted by this emulator. See the [research document](../research/azure-app-service-easy-auth-azure-static.md) for the rationale and open questions.
 
-## IdP 互換性
+## IdP compatibility
 
-| IdP | ログイン URL のキー | 既定の `authenticationType` | 発行者の初期値 |
+| IdP | Login URL key | Default `authenticationType` | Default issuer |
 |---|---|---|---|
 | Microsoft Entra ID | `aad` | `aad` | `https://login.microsoftonline.com/{tenantId}/v2.0` |
-| Facebook | `facebook` | `facebook` | なし |
+| Facebook | `facebook` | `facebook` | None |
 | Google | `google` | `google` | `https://accounts.google.com` |
-| X | `x` | `x` | なし |
-| GitHub | `github` | `github` | なし |
+| X | `x` | `x` | None |
+| GitHub | `github` | `github` | None |
 | Apple | `apple` | `apple` | `https://appleid.apple.com` |
 
-App Service の X は、ログイン URL では `x`、設定やトークンヘッダーでは `twitter` を使うため、公開面に不一致があります。実ヘッダーの値は公式文書だけでは確定できないため、このエミュレーターは `x` を既定とし、プロファイルの `authenticationType` で `twitter` へ変更できるようにしています。
+App Service uses `x` in the login URL for X, but `twitter` in configuration and token headers, so there is a public inconsistency. Since the actual header value cannot be confirmed from official documentation alone, this emulator defaults to `x` and allows it to be changed to `twitter` via the profile's `authenticationType`.
 
-非 AAD の完全なクレーム対応規則も公開されていません。`IdentityProviderRegistry` は保守的な既定値を持ちますが、次の設定で変更または無効化できます。
+The complete claim-mapping rules for non-AAD providers are also not publicly documented. `IdentityProviderRegistry` has conservative defaults, but they can be changed or disabled via the following settings.
 
 - `authenticationType`
 - `nameClaimType`
@@ -195,19 +197,19 @@ App Service の X は、ログイン URL では `x`、設定やトークンヘ�
 - `claimMappings.userId`
 - `claimMappings.tenantId`
 
-空文字または `null` の設定項目からは、対応する補助クレームを生成しません。
+Configuration fields left empty or `null` do not generate the corresponding auxiliary claim.
 
-Microsoft Entra ID では `userId` と `tenantId` に GUID を要求します。その他の IdP の `userId` は文字列です。
+Microsoft Entra ID requires `userId` and `tenantId` to be GUIDs. For other IdPs, `userId` is a string.
 
-`provider` を省略した既存プロファイルは `aad` として扱います。旧 `upn` は `userName` の別名として受理しますが、両方を同時に指定するとエラーになります。
+Existing profiles that omit `provider` are treated as `aad`. The legacy `upn` field is accepted as an alias for `userName`, but specifying both at the same time results in an error.
 
-任意の OpenID Connect プロバイダーは現在の対象外です。
+Arbitrary OpenID Connect providers are currently out of scope.
 
-## 設定
+## Configuration
 
-設定ファイルは UTF-8 JSON です。未知のプロパティ、重複したプロパティ、型の不一致を黙って無視せず、起動時にエラーにします。ファイルサイズは 1 MiB を上限とします。
+The configuration file is UTF-8 JSON. Unknown properties, duplicate properties, and type mismatches are not silently ignored — they cause a startup error. The file size is capped at 1 MiB.
 
-完全な制約は [JSON Schema](../schemas/easyauth-local.schema.json) が表します。
+The complete set of constraints is expressed by the [JSON Schema](../schemas/easyauth-local.schema.json).
 
 ```json
 {
@@ -228,51 +230,51 @@ Microsoft Entra ID では `userId` と `tenantId` に GUID を要求します。
 }
 ```
 
-### 発行者 (`issuer`) の正規化
+### Issuer (`issuer`) normalization
 
-- `issuer` が未指定なら IdP の既定値を使います。
-- `issuer` が空文字なら `iss` を出しません。
-- `issuer` が未指定で `claims` に `iss` が1件あれば、専用項目へ正規化します。
-- `issuer` と `claims[].typ = "iss"` を同時に指定するとエラーにします。
-- `iss` が複数ある場合もエラーにします。
+- If `issuer` is unspecified, the IdP's default value is used.
+- If `issuer` is an empty string, no `iss` is emitted.
+- If `issuer` is unspecified and `claims` contains exactly one `iss`, it is normalized into the dedicated field.
+- Specifying both `issuer` and `claims[].typ = "iss"` at the same time results in an error.
+- Multiple `iss` entries also result in an error.
 
 ### `--no-ui`
 
-`--no-ui` は `--config` と `--profile` を必須とし、選択プロファイルをプロセス全体の認証状態として使います。
+`--no-ui` requires `--config` and `--profile`, and uses the selected profile as the authentication state for the entire process.
 
-- 起動時から全クライアントが同じ ID で認証済みになります。
-- ログアウトはプロセス全体を未認証にします。
-- 選択プロファイルと同じ IdP のログイン URL だけが再有効化できます。
-- クライアントごとのセッション分離はありません。
+- All clients are authenticated as the same identity from startup.
+- Logging out unauthenticates the entire process.
+- Only the login URL for the same IdP as the selected profile can re-enable it.
+- There is no per-client session isolation.
 
-## セッション
+## Session
 
-通常モードでは、Cookie `AppServiceAuthSession` に 256 ビット CSPRNG で生成した不透明なセッション ID だけを格納します。ユーザー情報やプリンシパルは Cookie に入れず、サーバー側メモリに保持します。
+In normal mode, the `AppServiceAuthSession` cookie stores only an opaque session ID generated with a 256-bit CSPRNG. User information and the principal are not stored in the cookie; they are kept in server-side memory.
 
-Cookie 属性:
+Cookie attributes:
 
 - `HttpOnly`
 - `SameSite=Lax`
 - `Path=/`
-- 明示的な有効期限
-- HTTP のローカル待ち受けなので `Secure` は付けない
+- An explicit expiration
+- No `Secure`, since it listens over local HTTP
 
-既定の有効期間は8時間です。`/.auth/refresh` で期限を延長します。期限切れはリクエスト時と定期処理の両方で削除します。プロセスを終了するとすべてのセッションが失われます。
+The default lifetime is 8 hours. `/.auth/refresh` extends the expiration. Expired sessions are removed both on request and via periodic cleanup. Ending the process loses all sessions.
 
-8時間とその後の72時間の猶予は App Service 文書に記載されていますが、ACA 文書では同じ数値を独立確認できません。エミュレーターは両モードで8時間を使い、72時間の猶予は再現しません。
+The 8-hour lifetime and the subsequent 72-hour grace period are documented for App Service, but the same figures cannot be independently confirmed in ACA documentation. The emulator uses 8 hours in both modes, and does not reproduce the 72-hour grace period.
 
-## セキュリティ境界
+## Security boundaries
 
-### 待ち受けと転送先
+### Listening and upstream addresses
 
-- 待ち受けは `127.0.0.1` 固定です。
-- 転送先は `localhost`、`127.0.0.1`、`::1` など、このコンピューター自身を指すアドレスだけを許可します。
-- URL のユーザー情報、クエリ、フラグメントは転送先指定に使えません。
-- 転送先の TLS 検証は無効化しません。
+- The emulator always listens on `127.0.0.1`.
+- Only upstream addresses that point to this same computer, such as `localhost`, `127.0.0.1`, and `::1`, are allowed.
+- Userinfo, query, and fragment parts of the URL cannot be used to specify the upstream.
+- TLS validation for the upstream is never disabled.
 
-### ヘッダー偽装の防止
+### Preventing header spoofing
 
-転送前に次を削除し、エミュレーターが生成した値だけを使います。
+Before forwarding, the following are stripped, and only values generated by the emulator are used.
 
 - `X-MS-CLIENT-PRINCIPAL*`
 - `X-MS-TOKEN-*`
@@ -280,49 +282,49 @@ Cookie 属性:
 - `Forwarded`
 - `X-Forwarded-*`
 
-その後、実際の接続情報から `X-Forwarded-For`、`X-Forwarded-Host`、`X-Forwarded-Proto` を再生成します。
+Afterward, `X-Forwarded-For`, `X-Forwarded-Host`, and `X-Forwarded-Proto` are regenerated from the actual connection information.
 
-### フォームとリダイレクト
+### Forms and redirects
 
-- ログイン POST は ASP.NET Core の偽造防止機能を使います。
-- ログイン／ログアウト後の移動先はローカル絶対パスだけです。
-- `//example.com` 形式の URL、外部 URL、バックスラッシュ、制御文字、二重デコードで意味が変わる値を拒否します。
-- 認証 UI には CSP、`Cache-Control: no-store`、`X-Content-Type-Options: nosniff` などを付けます。
+- Login POSTs use ASP.NET Core's anti-forgery feature.
+- Post-login/logout destinations are local absolute paths only.
+- URLs in the `//example.com` form, external URLs, backslashes, control characters, and values whose meaning changes under double decoding are all rejected.
+- The authentication UI is served with CSP, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and similar headers.
 
-### ログ
+### Logging
 
-Cookie、トークン、プリンシパル全文を通常ログへ出しません。起動ログには転送先、プロキシ、ログイン URL、プロファイル名、UI モードだけを表示します。
+Cookies, tokens, and the full principal are never written to normal logs. Startup logs show only the upstream, the proxy, login URLs, profile names, and the UI mode.
 
-## プロキシ
+## Proxy
 
-YARP の直接転送機能を使い、通常のリクエストを指定した転送先へ送ります。
+Regular requests are forwarded to the specified upstream using YARP's direct forwarding feature.
 
-- HTTP メソッド、パス、クエリ、リクエスト本文を保持
-- レスポンス本文をストリーミング
-- サーバー送信イベント (SSE)
-- WebSocket への切り替え
-- 転送先のリダイレクトを自動追従しない
-- 転送先の Cookie をプロキシ自身の Cookie 保存領域に保存しない
-- 自動展開をしない
-- 接続タイムアウト10秒
-- 無通信タイムアウト10分
+- Preserves the HTTP method, path, query, and request body
+- Streams the response body
+- Server-sent events (SSE)
+- Switches to WebSocket
+- Does not automatically follow upstream redirects
+- Does not store the upstream's cookies in the proxy's own cookie storage
+- No automatic decompression
+- 10-second connection timeout
+- 10-minute idle timeout
 
-転送開始前の失敗は、タイムアウト系を `504`、その他を `502` として返します。レスポンス開始後の失敗やクライアント切断では、新しいエラー本文を追加しません。
+Failures before forwarding begins return `504` for timeout-related failures and `502` for others. Failures after the response has started, or client disconnects, do not add a new error body.
 
-HTTP/2 と gRPC は YARP / Kestrel が処理できる場合がありますが、このプロジェクトの互換保証対象ではありません。
+HTTP/2 and gRPC may work if YARP / Kestrel can handle them, but they are not within this project's compatibility guarantees.
 
-## テスト
+## Testing
 
-### ソースから起動
+### Running from source
 
-転送先アプリを起動したうえで、次のコマンドを実行します。
+After starting the upstream app, run the following command.
 
 ```console
 dotnet run --project src/EasyAuthLocalEmulator -- \
   start http://localhost:5173
 ```
 
-付属サンプルを転送先にする場合:
+To use the bundled sample as the upstream:
 
 ```console
 dotnet run --project samples/EasyAuthLocalEmulator.SampleApp -- \
@@ -331,17 +333,17 @@ dotnet run --project samples/EasyAuthLocalEmulator.SampleApp -- \
 
 ### UnitTests
 
-主な対象:
+Main coverage:
 
-- CLI オプションと設定
-- JSON の未知項目・重複項目
-- IdP 定義と後方互換
-- 発行者とクレーム対応規則
-- プリンシパル JSON と Base64
-- ヘッダー生成と偽装除去
-- セッションの発行、期限、更新、ログアウト
-- リダイレクト検証
-- 認証 UI のセキュリティヘッダー
+- CLI options and configuration
+- Unknown/duplicate properties in JSON
+- IdP definitions and backward compatibility
+- Issuer and claim-mapping rules
+- Principal JSON and Base64
+- Header generation and spoofing removal
+- Session issuance, expiration, refresh, and logout
+- Redirect validation
+- Security headers for the authentication UI
 
 ```console
 dotnet test tests/EasyAuthLocalEmulator.UnitTests/EasyAuthLocalEmulator.UnitTests.csproj \
@@ -350,22 +352,22 @@ dotnet test tests/EasyAuthLocalEmulator.UnitTests/EasyAuthLocalEmulator.UnitTest
 
 ### BrowserTests
 
-BrowserTests は、サンプルアプリと `easyauth` を別プロセスで動的ポートへ起動します。手動確認と同じサンプルを使うことで、UI だけでなく実際のプロキシ経路を検証します。
+BrowserTests starts the sample app and `easyauth` as separate processes on dynamic ports. By reusing the same sample as manual verification, it exercises the actual proxy path, not just the UI.
 
-主な対象:
+Main coverage:
 
-- ログイン画面、入力検証、偽造防止
-- 6 IdP とプロバイダーごとのプロファイル
-- 発行者と X の `twitter` 上書き
-- プリンシパルと `/.auth/me` の一致
-- クライアント指定ヘッダーの除去
-- ログアウト、更新、no-UI
-- HTTP メソッド、本文、クエリ
-- SSE、WebSocket
-- 転送先エラー、ポート競合
-- モバイル表示と主要な UI 状態
+- Login screen, input validation, anti-forgery
+- The 6 IdPs and per-provider profiles
+- Issuer and the `twitter` override for X
+- Consistency between the principal and `/.auth/me`
+- Removal of client-supplied headers
+- Logout, refresh, no-UI
+- HTTP methods, body, query
+- SSE, WebSocket
+- Upstream errors, port conflicts
+- Mobile display and key UI states
 
-初回だけブラウザーをインストールします。
+Browsers only need to be installed the first time.
 
 ```console
 pwsh tests/EasyAuthLocalEmulator.BrowserTests/bin/Release/net10.0/playwright.ps1 \
@@ -384,66 +386,66 @@ BROWSER=webkit dotnet test \
   --configuration Release --no-build --no-restore
 ```
 
-PowerShell では実行前に `$env:BROWSER = "chromium"` または `"webkit"` を設定します。
+On PowerShell, set `$env:BROWSER = "chromium"` or `"webkit"` before running.
 
-### 子プロセス
+### Child processes
 
-`tests/EasyAuthLocalEmulator.BrowserTests/Fixtures` の責務:
+Responsibilities of `tests/EasyAuthLocalEmulator.BrowserTests/Fixtures`:
 
-| クラス | 責務 |
+| Class | Responsibility |
 |---|---|
-| `ChildProcess` | 起動、標準出力・標準エラー、起動確認、タイムアウト、プロセスツリー終了 |
-| `SampleAppProcess` | サンプルアプリを動的ポートで起動 |
-| `EmulatorProcess` | 一時設定を作成してエミュレーターを起動 |
-| `BrowserFixture` | サンプル、エミュレーターの順に起動し、逆順に終了 |
+| `ChildProcess` | Startup, stdout/stderr, startup confirmation, timeout, process-tree termination |
+| `SampleAppProcess` | Starts the sample app on a dynamic port |
+| `EmulatorProcess` | Creates a temporary configuration and starts the emulator |
+| `BrowserFixture` | Starts the sample and emulator in order, and stops them in reverse order |
 
-## ビルドとリリース
+## Build and release
 
-すべてのプロジェクトは .NET 10 を使用し、nullable と warnings-as-errors を有効にしています。
+All projects target .NET 10, with nullable reference types and warnings-as-errors enabled.
 
-CI は Windows と macOS で次を実行します。
+CI runs the following on Windows and macOS.
 
-- パッケージの復元
-- Release ビルド
+- Package restore
+- Release build
 - UnitTests
 - Chromium BrowserTests
 - WebKit BrowserTests
 
-`v*` タグで、次の自己完結単一ファイルを作ります。
+For `v*` tags, the following self-contained single-file binaries are built.
 
 - `win-x64`
 - `win-arm64`
 - `osx-x64`
 - `osx-arm64`
 
-リリースワークフローは RID ごとのアーカイブと SHA-256 チェックサムを作り、GitHub Release へ添付します。サンプルアプリは配布アーカイブに含めません。
+The release workflow creates an archive and a SHA-256 checksum per RID, and attaches them to the GitHub Release. The sample app is not included in the distributed archives.
 
-## ソース構成
+## Source layout
 
-| パス | 内容 |
+| Path | Content |
 |---|---|
-| `src/EasyAuthLocalEmulator/Cli` | コマンド定義と起動 |
-| `src/EasyAuthLocalEmulator/Configuration` | 設定 DTO、読込、検証 |
-| `src/EasyAuthLocalEmulator/Auth` | IdP、プロファイル、プリンシパル、セッション、認証ルート |
-| `src/EasyAuthLocalEmulator/Proxy` | YARP とリクエスト変換 |
-| `src/EasyAuthLocalEmulator/Pages/Auth` | ログイン／ログアウト UI |
-| `samples/EasyAuthLocalEmulator.SampleApp` | 手動確認／E2E 共用サンプル |
+| `src/EasyAuthLocalEmulator/Cli` | Command definitions and startup |
+| `src/EasyAuthLocalEmulator/Configuration` | Configuration DTOs, loading, validation |
+| `src/EasyAuthLocalEmulator/Auth` | IdP, profiles, principal, session, authentication routes |
+| `src/EasyAuthLocalEmulator/Proxy` | YARP and request transformation |
+| `src/EasyAuthLocalEmulator/Pages/Auth` | Login/logout UI |
+| `samples/EasyAuthLocalEmulator.SampleApp` | Sample shared by manual verification / E2E |
 | `tests/EasyAuthLocalEmulator.UnitTests` | UnitTests |
 | `tests/EasyAuthLocalEmulator.BrowserTests` | Playwright E2E |
 | `schemas` | JSON Schema |
-| `.github/workflows` | CI / リリース |
+| `.github/workflows` | CI / release |
 
-## 非目標と不確定事項
+## Non-goals and open questions
 
-現在の対象外:
+Currently out of scope:
 
-- 実 IdP への接続
-- 実アクセストークン、ID トークン、更新トークン
-- `X-MS-TOKEN-*` の生成
-- 任意の OpenID Connect プロバイダー
-- Azure の非公開 Cookie 内部形式
-- Windows IIS のプロセス内統合
-- App Service の認可設定全体
-- HTTP/2 / gRPC の互換保証
+- Connecting to a real IdP
+- Real access tokens, ID tokens, and refresh tokens
+- Generating `X-MS-TOKEN-*`
+- Arbitrary OpenID Connect providers
+- Azure's undocumented internal cookie format
+- In-process integration with Windows IIS
+- The full set of App Service authorization settings
+- HTTP/2 / gRPC compatibility guarantees
 
-公式文書だけでは、非 AAD の完全なクレーム対応規則、X の実際の `auth_typ`、`/.auth/me` の完全なスキーマ、未認証時のすべての構成差を確定できません。現在の選択と証拠レベルは [調査資料](../research/azure-app-service-easy-auth-azure-static.md) に記録しています。
+The official documentation alone cannot confirm the complete claim-mapping rules for non-AAD providers, the actual `auth_typ` for X, the full `/.auth/me` schema, or every configuration difference when unauthenticated. Current choices and their evidence level are recorded in the [research document](../research/azure-app-service-easy-auth-azure-static.md).

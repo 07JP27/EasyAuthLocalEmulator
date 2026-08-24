@@ -1,98 +1,97 @@
 # EasyAuth Local Emulator
 
-Azure App Service Easy Auth と Azure Container Apps の組み込み認証を、実際の ID プロバイダーなしでローカル再現する開発用プロキシです。
+<p align="center">English | <a href="README_jp.md">日本語</a></p>
 
-- 任意のローカル Web アプリを認証プロキシの後ろで動かせます。
-- ブラウザーまたは設定ファイルから模擬ユーザーを作れます。
-- `/.auth/me` と転送ヘッダーを Azure へデプロイする前に確認できます。
+A development proxy that locally reproduces "Azure App Service Easy Auth" and "Azure Container Apps built-in authentication" without a real identity provider.
 
-## 仕組み
+- Run any local web app behind the authentication proxy.
+- Create mock users from the browser or from a configuration file.
+- Verify the `/.auth/me` response and forwarded headers your web app uses, before deploying to Azure.
+- The emulator handles `/.auth/*` itself, and forwards all other requests to your local app with the required Easy Auth headers attached.
 
-![EasyAuth Local Emulator のリクエスト経路](docs/easy-auth-local-emulator-overview.drawio.svg)
+![EasyAuth Local Emulator request path](docs/overview.png)
 
-ブラウザーや API クライアントは、元のアプリではなく `http://127.0.0.1:4180` へ接続します。
-`/.auth/*` はエミュレーターが処理し、それ以外のリクエストは必要な Easy Auth ヘッダーを付けてローカルアプリへ転送します。
 
-## クイックスタート
+## Quick start
 
-前提:
+Prerequisites:
 
-- Windows または macOS
-- 転送先アプリは `localhost`、`127.0.0.1`、`::1` のいずれかで待ち受ける
+- Windows or macOS
+- The upstream app listens on `localhost`, `127.0.0.1`, or `::1`
 
-リリース版を使う場合は、[GitHub Releases](https://github.com/07JP27/EasyAuthLocalEmulator/releases) から環境に合うアーカイブを展開し、`easyauth` を実行できる場所へ配置してください。
+To use a release build, extract the archive that matches your environment from [GitHub Releases](https://github.com/07JP27/EasyAuthLocalEmulator/releases) and place `easyauth` somewhere you can run it from.
 
-1. 対象にする Web アプリを起動します。ここでは `http://localhost:5173` とします。
+1. Start the web app you want to target. Here we use `http://localhost:5173`.
 
-2. 別のターミナルでエミュレーターを起動します。
+2. Start the emulator in another terminal.
 
    ```console
    easyauth start http://localhost:5173
    ```
 
-   Azure Container Apps を再現する場合:
+   To reproduce Azure Container Apps:
 
    ```console
    easyauth start http://localhost:5173 \
      --platform container-apps
    ```
 
-3. `http://127.0.0.1:4180` を開きます。
+3. Open `http://127.0.0.1:4180`.
 
-4. `http://127.0.0.1:4180/.auth/login/aad` などのログイン URL で模擬ユーザーを設定します。
+4. Set up a mock user via a login URL such as `http://127.0.0.1:4180/.auth/login/aad`.
 
-ポート `4180` が使用中の場合は、`--port` で別のポートを指定してください。
+If port `4180` is already in use, specify a different port with `--port`.
 
-## サンプルで試す
+## Try it with the sample
 
-転送先アプリがない場合は、付属のサンプルを起動できます。サンプルの実行には .NET 10 SDK が必要です。
+If you don't have an upstream app, you can run the bundled sample instead. Running the sample requires the .NET 10 SDK.
 
 ```console
 dotnet run --project samples/EasyAuthLocalEmulator.SampleApp -- \
   --urls http://127.0.0.1:5173
 ```
 
-続けて、別のターミナルでエミュレーターを起動します。
+Then start the emulator in another terminal.
 
 ```console
 easyauth start http://127.0.0.1:5173
 ```
 
-`http://127.0.0.1:4180` を開くと、認証状態、4つの Easy Auth ヘッダー、復号済みプリンシパルを確認できます。サンプルには HTTP、SSE、WebSocket の診断用エンドポイントも含まれます。
+Opening `http://127.0.0.1:4180` shows the authentication state, the four Easy Auth headers, and the decoded principal. The sample also includes diagnostic endpoints for HTTP, SSE, and WebSocket.
 
-## コマンド
+## Commands
 
 ```console
 easyauth start <upstream-url> [options]
 ```
 
-| オプション | 説明 |
+| Option | Description |
 |---|---|
-| `--platform <platform>` | `app-service` または `container-apps`。既定値は `app-service` |
-| `--port <port>` | プロキシのポート。既定値は `4180` |
-| `--open` | 起動後にプロキシ URL を既定のブラウザーで開く |
-| `--config <path>` | JSON 設定ファイル |
-| `--profile <name>` | 設定ファイル内のプロファイル |
-| `--no-ui` | 選択プロファイルを画面なしで使用する |
+| `--platform <platform>` | `app-service` or `container-apps`. Defaults to `app-service` |
+| `--port <port>` | The proxy port. Defaults to `4180` |
+| `--open` | Opens the proxy URL in the default browser after startup |
+| `--config <path>` | JSON configuration file |
+| `--profile <name>` | Profile within the configuration file |
+| `--no-ui` | Uses the selected profile without any UI |
 
-エミュレーターは `127.0.0.1` だけで待ち受け、転送先もこのコンピューター自身を指すアドレスだけを許可します。
-platform は起動するたびに CLI で選び、JSON 設定には保存しません。
+The emulator only listens on `127.0.0.1`, and only allows upstream addresses that point to this same computer.
+The platform is chosen on the CLI each time it starts, and is never saved in the JSON configuration.
 
-## 対応プラットフォーム
+## Supported platforms
 
-| `--platform` | 再現対象 | 既定のログアウト完了 URL |
+| `--platform` | Reproduces | Default logout-complete URL |
 |---|---|---|
 | `app-service` | Azure App Service Easy Auth | `/.auth/logout/complete` |
 | `container-apps` | Azure Container Apps authentication | `/.auth/logout/done` |
 
-ログイン画面とログアウト完了画面には、現在選択している platform が表示されます。
+The login screen and the logout-complete screen show the currently selected platform.
 
 > [!NOTE]
-> Azure Container Apps モードでは、SPA のクライアント側ルーターが `/.auth/login/*` を横取りしないようにしてください。このルートはサーバー側の認証機能へ到達する必要があります。
+> In Azure Container Apps mode, make sure your SPA's client-side router doesn't intercept `/.auth/login/*`. This route must reach the server-side authentication feature.
 
-## プロファイル
+## Profiles
 
-繰り返し使う模擬ユーザーは JSON に保存できます。
+Mock users you use repeatedly can be saved as JSON.
 
 ```json
 {
@@ -119,7 +118,7 @@ easyauth start http://localhost:5173 \
   --profile alice-admin
 ```
 
-自動テストでは同じプロファイルを画面なしで有効化できます。
+For automated tests, you can enable the same profile without any UI.
 
 ```console
 easyauth start http://localhost:5173 \
@@ -128,11 +127,11 @@ easyauth start http://localhost:5173 \
   --no-ui
 ```
 
-`provider` を省略した既存設定は `aad` として扱い、旧 `upn` も利用できます。全設定項目は [JSON Schema](schemas/easyauth-local.schema.json) を参照してください。
+Existing configurations that omit `provider` are treated as `aad`, and the legacy `upn` field is still accepted. See the [JSON Schema](schemas/easyauth-local.schema.json) for all configuration options.
 
-## 対応する ID プロバイダー
+## Supported identity providers
 
-| ID プロバイダー | ログイン URL |
+| Identity provider | Login URL |
 |---|---|
 | Microsoft Entra ID | `/.auth/login/aad` |
 | Facebook | `/.auth/login/facebook` |
@@ -141,37 +140,37 @@ easyauth start http://localhost:5173 \
 | GitHub | `/.auth/login/github` |
 | Apple | `/.auth/login/apple` |
 
-## アプリから見えるもの
+## What your app sees
 
-### 認証ルート
+### Authentication routes
 
-| ルート | 用途 |
+| Route | Purpose |
 |---|---|
-| `GET /.auth/login/<provider>` | 模擬ユーザーでログイン |
-| `GET /.auth/me` | 現在の ID 情報を取得 |
-| `GET /.auth/logout` | ログアウト |
-| `GET /.auth/refresh` | ローカルセッションの有効期限を延長 |
+| `GET /.auth/login/<provider>` | Log in as a mock user |
+| `GET /.auth/me` | Get the current identity information |
+| `GET /.auth/logout` | Log out |
+| `GET /.auth/refresh` | Extend the local session's expiration |
 
-### 転送ヘッダー
+### Forwarded headers
 
-| ヘッダー | 内容 |
+| Header | Content |
 |---|---|
-| `X-MS-CLIENT-PRINCIPAL` | クレームを含む Base64 符号化 JSON |
-| `X-MS-CLIENT-PRINCIPAL-ID` | ユーザー ID |
-| `X-MS-CLIENT-PRINCIPAL-NAME` | ユーザー名またはメールアドレス |
-| `X-MS-CLIENT-PRINCIPAL-IDP` | ID プロバイダー名 |
+| `X-MS-CLIENT-PRINCIPAL` | Base64-encoded JSON containing the claims |
+| `X-MS-CLIENT-PRINCIPAL-ID` | User ID |
+| `X-MS-CLIENT-PRINCIPAL-NAME` | Username or email address |
+| `X-MS-CLIENT-PRINCIPAL-IDP` | Identity provider name |
 
-クライアントが送った同名ヘッダーは転送前に削除し、エミュレーターが生成した値に置き換えます。セッションの既定有効期間は8時間で、エミュレーターを終了すると失われます。
+Any of these headers sent by the client are stripped before forwarding and replaced with the values the emulator generates. The default session lifetime is 8 hours, and sessions are lost when the emulator exits.
 
-## 制限事項
+## Limitations
 
-- ローカル開発専用です。本番環境へ公開しないでください。
-- 実トークンを生成しないため、外部 API、条件付きアクセス、実際の ID プロバイダー認証は再現しません。
-- 任意の OpenID Connect プロバイダー、platform の認可設定全体、IIS 統合、HTTP/2・gRPC の互換性は保証しません。
-- 最終確認は Azure 上で実施してください。
+- This is for local development only. Do not expose it in production.
+- It does not generate real tokens, so it does not reproduce external APIs, conditional access, or actual identity provider authentication.
+- Arbitrary OpenID Connect providers, the full set of platform authorization settings, IIS integration, and HTTP/2 / gRPC compatibility are not guaranteed.
+- Perform final verification on Azure.
 
-## さらに詳しく
+## Learn more
 
-- [Deep Dive](docs/deep-dive.md): アーキテクチャ、互換性、セキュリティ、開発・テスト
-- [実現性調査](research/azure-app-service-easy-auth-azure-static.md): 調査過程、既存ツール比較、出典
-- [JSON Schema](schemas/easyauth-local.schema.json): 設定項目と制約
+- [Deep Dive](docs/deep-dive.md): architecture, compatibility, security, and development/testing
+- [Feasibility research](research/azure-app-service-easy-auth-azure-static.md): research process, comparison with existing tools, and sources
+- [JSON Schema](schemas/easyauth-local.schema.json): configuration options and constraints
