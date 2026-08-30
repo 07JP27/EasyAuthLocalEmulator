@@ -11,6 +11,7 @@ A development proxy that locally reproduces "Azure App Service Easy Auth" and "A
 
 ![EasyAuth Local Emulator request path](docs/overview.png)
 
+![EasyAuth Local Emulator login screen](docs/login.png)
 
 ## Quick start
 
@@ -19,28 +20,142 @@ Prerequisites:
 - Windows or macOS
 - The upstream app listens on `localhost`, `127.0.0.1`, or `::1`
 
-To use a release build, extract the archive that matches your environment from [GitHub Releases](https://github.com/07JP27/EasyAuthLocalEmulator/releases) and place `easyauth` somewhere you can run it from.
+### 1. Download the release
 
-1. Start the web app you want to target. Here we use `http://localhost:5173`.
+Download the archive for your computer and its matching `.sha256` file from [GitHub Releases](https://github.com/07JP27/EasyAuthLocalEmulator/releases).
 
-2. Start the emulator in another terminal.
+| Computer | Identifier in the file name |
+|---|---|
+| Windows, Intel or AMD | `win-x64` |
+| Windows on Arm | `win-arm64` |
+| Mac, Apple silicon | `osx-arm64` |
+| Mac, Intel | `osx-x64` |
 
-   ```console
-   easyauth start http://localhost:5173
-   ```
+### 2. Verify the download
 
-   To reproduce Azure Container Apps:
+Before bypassing an operating-system security warning, verify that the archive matches the checksum published with the release. The examples below use `v0.1.0`; replace the version and RID with the files you downloaded.
 
-   ```console
-   easyauth start http://localhost:5173 \
-     --platform container-apps
-   ```
+macOS:
 
-3. Open `http://127.0.0.1:4180`.
+Open the folder containing the downloaded archive and checksum in Terminal. You can type `cd `, drag the folder from Finder into Terminal, and press Return.
 
-4. Set up a mock user via a login URL such as `http://127.0.0.1:4180/.auth/login/aad`.
+```console
+shasum -a 256 -c easyauth-v0.1.0-osx-arm64.tar.gz.sha256
+```
 
-If port `4180` is already in use, specify a different port with `--port`.
+Continue only if the result ends in `OK`, then double-click the `.tar.gz` file in Finder to extract it.
+
+Windows PowerShell:
+
+Open the folder containing the downloaded archive and checksum in File Explorer, type `powershell` in the address bar, and press Enter.
+
+```powershell
+$archive = ".\easyauth-v0.1.0-win-x64.zip"
+$expected = (Get-Content "$archive.sha256").Split()[0]
+$actual = (Get-FileHash $archive -Algorithm SHA256).Hash
+$actual.ToLowerInvariant() -eq $expected.ToLowerInvariant()
+```
+
+Continue only if the result is `True`. Extract the archive after verification.
+
+### 3. Install the CLI
+
+#### macOS
+
+Open the extracted folder in Terminal:
+
+1. Type `cd `, including the trailing space.
+2. Drag the extracted folder from Finder into the Terminal window.
+3. Press Return.
+4. Confirm that the executable is in the current folder.
+
+```console
+pwd
+ls -l ./easyauth
+```
+
+`./easyauth` means “the `easyauth` file in the current folder.” If it reports `No such file or directory`, return to the steps above and open the extracted folder.
+
+Install the CLI into `/usr/local/bin`, which is normally on your `PATH`:
+
+```console
+sudo mkdir -p /usr/local/bin
+sudo install -m 755 ./easyauth /usr/local/bin/easyauth
+```
+
+When `sudo` asks for `Password:`, enter your Mac login password and press Return. No characters appear while you type.
+
+Verify the installation with `easyauth --version`. The current macOS release is not signed with an Apple Developer ID or notarized by Apple, so this first run may be blocked by Gatekeeper. The warning is not itself a malware detection, but only override it after confirming that you downloaded the file from this repository and verified its checksum.
+
+Choose either method:
+
+- **System Settings:** Run `easyauth --version` once to trigger the warning. Then open **System Settings → Privacy & Security**, select **Open Anyway** for `easyauth`, confirm, and run the command again.
+- **Terminal:**
+
+  ```console
+  sudo xattr -d com.apple.quarantine /usr/local/bin/easyauth
+  easyauth --version
+  ```
+
+See [Apple's Gatekeeper guidance](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
+
+#### Windows
+
+In File Explorer, open the extracted folder, type `powershell` in the address bar, and press Enter. Confirm that PowerShell opened the correct folder:
+
+```powershell
+Get-Location
+Get-ChildItem .\easyauth.exe
+```
+
+The current Windows release is not Authenticode-signed. If you open the executable from File Explorer, Microsoft Defender SmartScreen may warn about the unrecognized app. A security policy may also block downloaded files. Only override a warning after confirming that you downloaded the file from this repository and verified its checksum.
+
+Choose either method:
+
+- **Windows UI:** Right-click `easyauth.exe`, open **Properties**, select **Unblock**, and apply the change. If you double-click the executable and Microsoft Defender SmartScreen shows **Windows protected your PC**, select **More info → Run anyway**.
+- **PowerShell:**
+
+  ```powershell
+  Unblock-File -LiteralPath .\easyauth.exe
+  ```
+
+`Unblock-File` performs the same operation as the **Unblock** option in File Explorer. See the [Microsoft `Unblock-File` documentation](https://learn.microsoft.com/powershell/module/microsoft.powershell.utility/unblock-file).
+See also [Microsoft's guidance for App & browser control and SmartScreen](https://support.microsoft.com/windows/app-browser-control-in-the-windows-security-app-7b2fd298-bf1d-4e39-97d4-043e94fd5d96).
+
+Install the CLI for your Windows user and add it to the user `PATH`:
+
+```powershell
+$installDir = "$env:LOCALAPPDATA\Programs\EasyAuthLocalEmulator"
+New-Item -ItemType Directory -Force $installDir | Out-Null
+Copy-Item .\easyauth.exe $installDir -Force
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($userPath -split ";") -notcontains $installDir) {
+  $newPath = if ([string]::IsNullOrEmpty($userPath)) { $installDir } else { "$userPath;$installDir" }
+  [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+}
+```
+
+Open a new PowerShell window, then verify the installation:
+
+```powershell
+easyauth --version
+```
+
+### 4. Start the emulator
+
+Start the local web app you want to put behind Easy Auth and note its URL. Then run the emulator in another terminal:
+
+```console
+easyauth start http://localhost:5173 --open
+```
+
+Replace `http://localhost:5173` with your app's URL. To emulate Azure Container Apps, append `--platform container-apps`.
+
+The `--open` option opens the proxy at `http://127.0.0.1:4180`. Set up a mock user at a login URL such as `http://127.0.0.1:4180/.auth/login/aad`.
+
+Always access your app through the proxy while using the emulator. Opening the original app URL directly bypasses Easy Auth. If port `4180` is already in use, specify a different port with `--port`.
+
+To try the executable without installing it, run `./easyauth start ...` on macOS or `.\easyauth.exe start ...` in Windows PowerShell from the extracted folder. The same operating-system warnings may appear. For the macOS Terminal method, target the extracted file with `xattr -d com.apple.quarantine ./easyauth`; on Windows, use the `Unblock-File` command shown above before running it.
 
 ## Try it with the sample
 
